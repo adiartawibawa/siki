@@ -2,6 +2,7 @@
 
 use App\Enums\Ability;
 use App\Enums\UserRole;
+use App\Livewire\Concerns\Notifies;
 use App\Models\Role;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -12,13 +13,19 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Layout('layouts.app')] #[Title('Roles')] class extends Component {
+new #[Layout('layouts.app')] #[Title('Roles')] class extends Component
+{
+    use Notifies;
+
     public ?int $editingId = null;
+
     public string $name = '';
+
     public string $description = '';
+
     public string $level = '1';
+
     public array $permissions = [];
-    public ?string $notice = null;
 
     public function mount(): void
     {
@@ -41,7 +48,7 @@ new #[Layout('layouts.app')] #[Title('Roles')] class extends Component {
     {
         $actor = Auth::user();
 
-        return collect(Ability::cases())->map(fn(Ability $a) => $a->value)->filter(fn(string $p) => $actor->can($p))->values()->all();
+        return collect(Ability::cases())->map(fn (Ability $a) => $a->value)->filter(fn (string $p) => $actor->can($p))->values()->all();
     }
 
     /** Level tertinggi yang boleh dibuat: selalu di bawah level pembuatnya. */
@@ -91,7 +98,7 @@ new #[Layout('layouts.app')] #[Title('Roles')] class extends Component {
                 function ($attribute, $value, $fail) use ($editing) {
                     $taken = Role::query()
                         ->whereRaw('lower(name) = ?', [Str::lower($value)])
-                        ->when($editing, fn($q) => $q->whereKeyNot($editing->id))
+                        ->when($editing, fn ($q) => $q->whereKeyNot($editing->id))
                         ->exists();
 
                     if ($taken) {
@@ -100,13 +107,13 @@ new #[Layout('layouts.app')] #[Title('Roles')] class extends Component {
                 },
             ],
             'description' => ['nullable', 'string', 'max:160'],
-            'level' => ['required', 'integer', 'between:1,' . $this->maxLevel],
+            'level' => ['required', 'integer', 'between:1,'.$this->maxLevel],
             'permissions' => ['array'],
-            'permissions.*' => ['string', Rule::in(array_map(fn(Ability $a) => $a->value, Ability::cases()))],
+            'permissions.*' => ['string', Rule::in(array_map(fn (Ability $a) => $a->value, Ability::cases()))],
         ]);
 
         // Permission yang tidak dipegang pengguna ini tidak boleh ditambah, juga tidak boleh hilang diam-diam.
-        $kept = $editing ? $editing->permissions->pluck('name')->reject(fn($p) => in_array($p, $this->grantable, true))->all() : [];
+        $kept = $editing ? $editing->permissions->pluck('name')->reject(fn ($p) => in_array($p, $this->grantable, true))->all() : [];
         $chosen = array_values(array_intersect($data['permissions'], $this->grantable));
 
         DB::transaction(function () use ($editing, $data, $kept, $chosen) {
@@ -123,7 +130,7 @@ new #[Layout('layouts.app')] #[Title('Roles')] class extends Component {
             $role->syncPermissions(array_merge($kept, $chosen));
         });
 
-        $this->notice = 'Role “' . trim($data['name']) . ($editing ? '” was updated.' : '” was created.');
+        $this->notify('Role “'.trim($data['name']).($editing ? '” was updated.' : '” was created.'));
         $this->resetForm();
         $this->dispatch('modal-close-role-form');
     }
@@ -135,7 +142,7 @@ new #[Layout('layouts.app')] #[Title('Roles')] class extends Component {
 
         $role->delete();
 
-        $this->notice = "Role “{$role->name}” was deleted.";
+        $this->notify("Role “{$role->name}” was deleted.");
     }
 
     private function resetForm(): void
@@ -152,16 +159,6 @@ new #[Layout('layouts.app')] #[Title('Roles')] class extends Component {
 @endphp
 
 <div class="space-y-4">
-    @if ($notice)
-        <div role="status"
-            class="flex items-start justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            <span>{{ $notice }}</span>
-            <button type="button" wire:click="$set('notice', null)" aria-label="Dismiss"
-                class="rounded-md p-0.5 text-emerald-700 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
-                <x-ui.icon name="x" size="sm" />
-            </button>
-        </div>
-    @endif
 
     <x-ui.card>
         <div class="flex flex-wrap items-center justify-between gap-3">

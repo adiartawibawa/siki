@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Livewire\Concerns\Notifies;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Arr;
@@ -17,7 +18,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 
 new #[Layout('layouts.app')] #[Title('Users')] class extends Component {
-    use WithPagination;
+    use Notifies, WithPagination;
 
     #[Url(except: '')]
     public string $search = '';
@@ -39,8 +40,6 @@ new #[Layout('layouts.app')] #[Title('Users')] class extends Component {
     public string $email = '';
 
     public string $role = '';
-
-    public ?string $notice = null;
 
     public function mount(): void
     {
@@ -163,7 +162,7 @@ new #[Layout('layouts.app')] #[Title('Users')] class extends Component {
                 }
             });
 
-            $this->notice = "{$editing->name} was updated.";
+            $this->notify("{$editing->name} was updated.");
         } else {
             $user = DB::transaction(function () use ($attributes, $role) {
                 $user = new User($attributes);
@@ -178,7 +177,7 @@ new #[Layout('layouts.app')] #[Title('Users')] class extends Component {
 
             Password::sendResetLink(['email' => $user->email]);
 
-            $this->notice = "{$user->name} was added. An email with a link to set a password is on its way.";
+            $this->notify("{$user->name} was added. An email with a link to set a password is on its way.");
         }
 
         $this->resetForm();
@@ -193,8 +192,7 @@ new #[Layout('layouts.app')] #[Title('Users')] class extends Component {
         // Mencabut token "ingat saya"; sesi aktif gugur sendiri karena akun yang terhapus tidak lagi dimuat.
         $user->forceFill(['remember_token' => Str::random(60)])->save();
         $user->delete();
-
-        $this->notice = "{$user->name} was deactivated and can no longer log in.";
+        $this->notify("{$user->name} was deactivated and can no longer log in.");
     }
 
     public function restore(string $id): void
@@ -203,8 +201,7 @@ new #[Layout('layouts.app')] #[Title('Users')] class extends Component {
         $this->authorize('restore', $user);
 
         $user->restore();
-
-        $this->notice = "{$user->name} was restored.";
+        $this->notify("{$user->name} was restored.");
     }
 
     private function resetForm(): void
@@ -222,16 +219,6 @@ new #[Layout('layouts.app')] #[Title('Users')] class extends Component {
 @endphp
 
 <div class="space-y-4">
-    @if ($notice)
-        <div role="status"
-            class="flex items-start justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            <span>{{ $notice }}</span>
-            <button type="button" wire:click="$set('notice', null)" aria-label="Dismiss"
-                class="rounded-md p-0.5 text-emerald-700 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
-                <x-ui.icon name="x" size="sm" />
-            </button>
-        </div>
-    @endif
 
     <x-ui.card>
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -336,7 +323,7 @@ new #[Layout('layouts.app')] #[Title('Users')] class extends Component {
                                         wire:click="deactivate('{{ $u->id }}')"
                                         wire:confirm="Deactivate {{ $u->name }}? They won’t be able to log in until restored."
                                         aria-label="Deactivate {{ $u->name }}">
-                                        <x-ui.icon name="user-x" size="sm" />
+                                        <x-ui.icon name="user-round-x" size="sm" />
                                     </x-ui.button>
                                 @endcan
                             @endif

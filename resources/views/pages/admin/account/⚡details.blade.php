@@ -89,6 +89,7 @@ new #[Layout('layouts.app')] #[Title('Account')] class extends Component {
 
         session()->invalidate();
         session()->regenerateToken();
+        session()->flash('toast', ['type' => 'success', 'message' => 'Your account was deleted.']);
 
         $this->redirect('/');
     }
