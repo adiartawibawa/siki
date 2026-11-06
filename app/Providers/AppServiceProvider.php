@@ -7,10 +7,13 @@ use App\Models\User;
 use App\Settings\GeneralSettings;
 use App\Settings\MailSettings;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Spatie\LaravelSettings\Exceptions\MissingSettings;
@@ -42,6 +45,8 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->applySettings();
+
+        Event::listen(Login::class, fn () => session()->forget('promo.dismissed'));
     }
 
     /**
@@ -68,12 +73,15 @@ class AppServiceProvider extends ServiceProvider
 
     private function applySettings(): void
     {
+        if ($this->app->runningInConsole() && ! $this->settingsTableExists()) {
+            return;
+        }
+
         try {
             $general = app(GeneralSettings::class);
             $mail = app(MailSettings::class);
         } catch (QueryException|MissingSettings $e) {
-            // Wajar saat php artisan migrate pertama kali. Di luar itu, jangan disembunyikan.
-            if (! app()->runningInConsole()) {
+            if (! $this->app->runningInConsole()) {
                 report($e);
             }
 
@@ -87,5 +95,14 @@ class AppServiceProvider extends ServiceProvider
         ]);
 
         app()->setLocale($general->locale);
+    }
+
+    private function settingsTableExists(): bool
+    {
+        try {
+            return Schema::hasTable(config('settings.repositories.database.table') ?? 'settings');
+        } catch (\Throwable) {
+            return false; // koneksi database belum tersedia
+        }
     }
 }

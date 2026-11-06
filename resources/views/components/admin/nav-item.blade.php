@@ -67,7 +67,8 @@
                 @endif
             @endif
 
-            <a href="{{ $href }}" @if ($active) aria-current="page" @endif
+            <a href="{{ $href }}" @if ($href !== '#') wire:navigate @endif
+                @if ($active) aria-current="page" @endif
                 class="{{ $active ? ($child ? $on : $on . ' bg-slate-100') : $idle }} {{ $child ? 'py-2' : 'py-2.5' }} flex items-center gap-3 rounded-xl px-3 text-sm transition {{ $ring }}">
                 @unless ($child)
                     <x-ui.icon :name="$item['icon']" size="18" />

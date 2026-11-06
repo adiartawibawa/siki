@@ -36,7 +36,7 @@
         @endforeach
     </nav>
 
-    @if (config('admin.promo.enabled'))
+    @if (config('admin.promo.enabled') && !session('promo.dismissed'))
         <x-admin.promo class="mt-4" />
     @endif
 </aside>

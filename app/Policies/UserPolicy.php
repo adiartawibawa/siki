@@ -57,7 +57,7 @@ class UserPolicy
     /** Tidak pernah pada diri sendiri (itu lewat halaman Account). Selebihnya hanya ke level yang lebih rendah. */
     private function manages(User $actor, User $target): bool
     {
-        if ($actor->is($target)) {
+        if ($actor->is($target) || ! $target->isVisibleTo($actor)) {
             return false;
         }
 

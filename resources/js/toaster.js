@@ -90,3 +90,32 @@ document.addEventListener("alpine:init", () => {
         },
     }));
 });
+
+// Error request Livewire -> toast, menggantikan modal error bawaan.
+document.addEventListener("livewire:init", () => {
+    window.Livewire.hook("request", ({ fail }) => {
+        fail(({ status, preventDefault }) => {
+            const always = {
+                403: "You don’t have permission to do that.",
+                419: "Your session expired. Reload the page and try again.",
+                429: "Too many attempts. Wait a moment and try again.",
+            };
+
+            // Di mode dev, 404/500/503 dibiarkan memakai tampilan debug Livewire.
+            const production = {
+                404: "That item no longer exists. Reload the page.",
+                500: "Something went wrong. Please try again.",
+                503: "The application is being updated. Try again shortly.",
+            };
+
+            const messages = import.meta.env.PROD
+                ? { ...always, ...production }
+                : always;
+
+            if (messages[status]) {
+                preventDefault?.();
+                window.toast({ type: "danger", message: messages[status] });
+            }
+        });
+    });
+});

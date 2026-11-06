@@ -5,6 +5,7 @@
     'iconRight' => null,
     'href' => null,
     'pill' => false,
+    'navigate' => false,
 ])
 
 @php
@@ -22,7 +23,7 @@
         'icon-sm' => 'size-8',
     ];
     $tag = $href ? 'a' : 'button';
-    $extra = $href ? ['href' => $href] : ['type' => 'button'];
+    $extra = $href ? ['href' => $href] + ($navigate ? ['wire:navigate' => true] : []) : ['type' => 'button'];
     $classes = [
         'inline-flex shrink-0 items-center justify-center font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
         $variants[$variant] ?? $variants['outline'],

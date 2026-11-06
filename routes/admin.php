@@ -11,12 +11,18 @@ Route::middleware(['auth'])->group(function () {
     Route::livewire('/account', 'pages::admin.account.details')->name('account');
     Route::livewire('/account/security', 'pages::admin.account.security')->name('account.security');
 
-});
+    Route::prefix('settings')->name('settings.')->group(function () {
+        Route::redirect('/', '/settings/general');
+        Route::livewire('/general', 'pages::admin.settings.general')->name('general');
+        Route::livewire('/mail', 'pages::admin.settings.mail')->name('mail');
+    });
 
-Route::middleware(['auth'])->prefix('settings')->name('settings.')->group(function () {
-    Route::redirect('/', '/settings/general');
-    Route::livewire('/general', 'pages::admin.settings.general')->name('general');
-    Route::livewire('/mail', 'pages::admin.settings.mail')->name('mail');
+    Route::post('/promo/dismiss', function () {
+        session()->put('promo.dismissed', true);
+
+        return response()->noContent();
+    })->name('promo.dismiss');
+
 });
 
 Route::middleware(['auth', 'can:viewAny,'.User::class])->group(function () {

@@ -41,9 +41,11 @@
                 <x-ui.icon name="chevron-down" size="sm" color="text-slate-400" class="hidden sm:block" />
             </x-slot:trigger>
 
-            <x-ui.dropdown-item href="{{ route('account') }}" icon="sliders-horizontal">
-                Account settings
-            </x-ui.dropdown-item>
+            <x-ui.dropdown-item href="{{ route('profile') }}" icon="user" wire:navigate>Profile</x-ui.dropdown-item>
+            <x-ui.dropdown-item href="{{ route('account') }}" icon="sliders-horizontal" wire:navigate>Account
+                settings</x-ui.dropdown-item>
+            <x-ui.dropdown-item href="{{ route('account.security') }}" icon="shield-check"
+                wire:navigate>Security</x-ui.dropdown-item>
 
             <form method="POST" action="{{ Route::has('logout') ? route('logout') : '#' }}">
                 @csrf

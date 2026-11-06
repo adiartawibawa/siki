@@ -2,12 +2,12 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-
 use App\Enums\UserRole;
 use Database\Factories\UserFactory;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,6 +16,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Laravel\Fortify\TwoFactorAuthenticatable;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
@@ -32,10 +33,10 @@ use Spatie\Permission\Traits\HasRoles;
  */
 #[Fillable(['first_name', 'last_name', 'username', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasRoles, HasUuids, Notifiable, SoftDeletes;
+    use HasFactory, HasRoles, HasUuids, Notifiable, SoftDeletes, TwoFactorAuthenticatable;
 
     /**
      * Get the attributes that should be cast.
@@ -75,6 +76,18 @@ class User extends Authenticatable
     {
         return $this->isSuperAdmin()
             && static::role(UserRole::SuperAdmin->value)->count() <= 1;
+    }
+
+    /** Hook untuk aplikasi turunan: batasi akun yang terlihat oleh $actor (mis. per unit). Core: semua. */
+    public function scopeVisibleTo(Builder $query, User $actor): void
+    {
+        // sengaja kosong di Core
+    }
+
+    /** Pasangan scope di atas untuk satu akun. Keduanya harus selalu konsisten. */
+    public function isVisibleTo(User $actor): bool
+    {
+        return true;
     }
 
     /**

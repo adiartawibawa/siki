@@ -1,10 +1,30 @@
-@props(['illustration', 'step' => null, 'steps' => null, 'back' => null])
+@props([
+    'illustration',
+    'step' => null,
+    'steps' => null,
+    'back' => null,
 
-<div class="grid min-h-screen overflow-x-clip lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+    // Layout configuration
+    'minHeight' => 'min-h-screen',
+    'gridColumns' => 'lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]',
 
-    {{-- Panel kiri: brand + ilustrasi (ilustrasi sedikit melewati batas panel) --}}
+    // Panel configuration
+    'panelPadding' => 'px-10 py-10 xl:px-14',
+    'mainPadding' => 'px-6 py-8 sm:px-10',
+
+    // Content configuration
+    'contentWidth' => 'max-w-sm',
+    'contentPadding' => 'py-10',
+
+    // Illustration configuration
+    'illustrationWidth' => 'w-[115%]',
+])
+
+<div class="grid {{ $minHeight }} overflow-x-clip {{ $gridColumns }}">
+
+    {{-- Left panel --}}
     <aside class="relative hidden bg-[#E9E5F7] lg:block">
-        <div class="flex h-full flex-col px-10 py-10 xl:px-14">
+        <div class="flex h-full flex-col {{ $panelPadding }}">
             <a href="{{ url('/') }}" class="flex items-center gap-2 text-lg font-semibold text-slate-800">
                 <span class="grid size-6 place-items-center rounded-md bg-violet-700 text-xs text-white">
                     {{ Str::substr(config('app.name'), 0, 1) }}
@@ -19,14 +39,14 @@
         </div>
 
         <img src="{{ asset('images/' . $illustration) }}" alt=""
-            class="pointer-events-none absolute bottom-0 left-1/2 z-10 w-[115%] max-w-none -translate-x-1/2 select-none">
+            class="pointer-events-none absolute bottom-0 left-1/2 z-10 {{ $illustrationWidth }} max-w-none -translate-x-1/2 select-none">
     </aside>
 
-    {{-- Panel kanan --}}
-    <main class="relative flex flex-col px-6 py-8 sm:px-10">
+    {{-- Right panel --}}
+    <main class="relative flex flex-col {{ $mainPadding }}">
 
-        {{-- Bar atas: progress atau tombol kembali (opsional) --}}
-        <div class="mx-auto flex min-h-8 w-full max-w-sm items-center">
+        {{-- Top bar --}}
+        <div class="mx-auto flex min-h-8 w-full {{ $contentWidth }} items-center">
             @if ($step && $steps)
                 <div class="flex w-full items-center justify-between gap-6">
                     <div class="flex flex-1 gap-1" role="progressbar" aria-valuemin="1"
@@ -36,8 +56,10 @@
                                 class="h-0.5 flex-1 rounded-full {{ $i <= $step ? 'bg-slate-800' : 'bg-slate-200' }}"></span>
                         @endfor
                     </div>
-                    <span class="whitespace-nowrap text-xs text-slate-500">Step {{ $step }} of
-                        {{ $steps }}</span>
+
+                    <span class="whitespace-nowrap text-xs text-slate-500">
+                        Step {{ $step }} of {{ $steps }}
+                    </span>
                 </div>
             @elseif ($back)
                 <a href="{{ $back }}"
@@ -51,13 +73,15 @@
             @endif
         </div>
 
-        <div class="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">
-            {{-- Logo untuk mobile --}}
+        {{-- Form content --}}
+        <div class="mx-auto flex w-full flex-1 flex-col justify-center {{ $contentWidth }} {{ $contentPadding }}">
+
+            {{-- Mobile logo --}}
             <a href="{{ url('/') }}" class="mb-8 text-lg font-semibold text-slate-800 lg:hidden">
                 {{ config('app.name') }}
             </a>
 
-            {{-- Badge ikon: bisa diganti lewat <x-slot:badge> --}}
+            {{-- Badge --}}
             <div
                 class="mb-6 grid size-12 place-items-center rounded-full border border-slate-200 bg-violet-50 shadow-sm">
                 @isset($badge)
