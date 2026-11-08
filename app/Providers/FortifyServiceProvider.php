@@ -57,7 +57,7 @@ class FortifyServiceProvider extends ServiceProvider
 
         // Login dengan email atau username. Akun yang dinonaktifkan (soft delete) tidak ditemukan.
         Fortify::authenticateUsing(function (Request $request): ?User {
-            $login = Str::lower(trim((string) $request->input('login')));
+            $login = Str::lower(trim((string) $request->input(Fortify::username())));
             $password = (string) $request->input('password');
 
             $user = User::query()

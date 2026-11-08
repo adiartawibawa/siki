@@ -20,7 +20,7 @@ Alasan: throttle, regenerasi sesi, alur 2FA, dan redirect dikelola satu pihak. M
 Konsekuensi: Livewire hanya dipakai setelah login (Account, Users, Roles, Settings).
 
 **D04. Login dengan email atau username.** Disepakati.
-Detail: `fortify.username` = `login`; waktu respons disamakan untuk akun yang tidak dikenal.
+Detail: `fortify.username` tetap `email` dan **harus berupa kolom nyata**, karena Fortify membaca `$user->{username}` saat konfirmasi password. Kolom form itu menerima email atau username; pencocokannya dilakukan di `Fortify::authenticateUsing`. Waktu respons disamakan untuk akun yang tidak dikenal.
 
 **D05. Pendaftaran publik default tertutup** (setelan `registration_enabled`). Asumsi.
 Akun dibuat admin; undangan berupa tautan set password (alur reset password).

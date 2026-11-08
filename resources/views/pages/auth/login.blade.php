@@ -4,7 +4,7 @@
 
         <form method="POST" action="{{ route('login') }}" class="space-y-4">
             @csrf
-            <x-form.input label="Email or username" name="login" :value="old('login')" autocomplete="username" required
+            <x-form.input label="Email or username" name="email" :value="old('email')" autocomplete="username" required
                 autofocus />
             <x-form.input label="Password" name="password" type="password" autocomplete="current-password" required />
 
