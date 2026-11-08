@@ -42,7 +42,7 @@
             </x-slot:trigger>
 
             <x-ui.dropdown-item href="{{ route('profile') }}" icon="user" wire:navigate>Profile</x-ui.dropdown-item>
-            <x-ui.dropdown-item href="{{ route('account') }}" icon="sliders-horizontal" wire:navigate>Account
+            <x-ui.dropdown-item href="{{ route('account.details') }}" icon="sliders-horizontal" wire:navigate>Account
                 settings</x-ui.dropdown-item>
             <x-ui.dropdown-item href="{{ route('account.security') }}" icon="shield-check"
                 wire:navigate>Security</x-ui.dropdown-item>

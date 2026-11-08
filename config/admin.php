@@ -1,40 +1,26 @@
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| Navigasi sidebar
+|--------------------------------------------------------------------------
+| Sebuah item tampil hanya bila:
+|   - route-nya terdaftar (Route::has), dan
+|   - pengguna lolos 'can' (bila ada), dan
+|   - config 'when' bernilai true (bila ada).
+| Induk tanpa anak yang tampil, dan grup tanpa item yang tampil, ikut disembunyikan.
+|
+| Kunci item : label, icon (nama berkas Lucide), route, can, when, badge, match, children.
+| 'match'    : pola route untuk penanda aktif, mis. 'users.*'. Bawaannya {route} dan {route}.*
+| Route harus tanpa parameter wajib.
+*/
+
 return [
     'nav' => [
         [
             'title' => 'Menu',
             'items' => [
                 ['label' => 'Dashboard', 'icon' => 'layout-grid', 'route' => 'dashboard'],
-                [
-                    'label' => 'Analytics',
-                    'icon' => 'chart-column',
-                    'children' => [
-                        ['label' => 'Overview', 'route' => 'analytics.overview'],
-                        ['label' => 'Reports',  'route' => 'analytics.reports'],
-                        ['label' => 'Exports',  'route' => 'analytics.exports', 'can' => 'export-data'],
-                    ],
-                ],
-                ['label' => 'Insights', 'icon' => 'sparkles', 'route' => 'insights'],
-                ['label' => 'Updates',  'icon' => 'clock', 'route' => 'updates'],
-                ['label' => 'Chat',     'icon' => 'message-circle', 'route' => 'chat', 'badge' => 20],
-            ],
-        ],
-        [
-            'title' => 'General',
-            'items' => [
-                [
-                    'label' => 'Settings',
-                    'icon' => 'settings',
-                    // 'can' => '',
-                    'children' => [
-                        ['label' => 'General', 'route' => 'settings.general'],
-                        ['label' => 'Mail',    'route' => 'settings.mail'],
-                    ],
-                ],
-                ['label' => 'Help Desk',   'icon' => 'circle-help', 'route' => 'help'],
-                ['label' => 'Integration', 'icon' => 'link', 'route' => 'integrations'],
-                ['label' => 'Feedback',    'icon' => 'message-square-text', 'route' => 'feedback'],
             ],
         ],
         [
@@ -42,9 +28,27 @@ return [
             'items' => [
                 ['label' => 'Users', 'icon' => 'users', 'route' => 'users.index', 'can' => 'users.view'],
                 ['label' => 'Roles', 'icon' => 'shield', 'route' => 'roles.index', 'can' => 'roles.view'],
+                [
+                    'label' => 'Settings',
+                    'icon' => 'settings',
+                    'can' => 'manage-settings',
+                    'children' => [
+                        ['label' => 'General', 'route' => 'settings.general'],
+                        ['label' => 'Mail', 'route' => 'settings.mail'],
+                    ],
+                ],
+            ],
+        ],
+        [
+            'title' => 'Developer',
+            'items' => [
+                ['label' => 'Showcase', 'icon' => 'book-open', 'route' => 'showcase', 'when' => 'admin.showcase'],
             ],
         ],
     ],
+
+    // Hanya aktif di lingkungan local. Di staging atau production harus dinyalakan dengan sadar.
+    'showcase' => env('SHOWCASE_ENABLED', env('APP_ENV') === 'local'),
 
     'promo' => [
         'enabled' => true,

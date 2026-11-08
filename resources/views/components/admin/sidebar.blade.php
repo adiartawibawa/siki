@@ -22,8 +22,7 @@
     </div>
 
     <nav aria-label="Sidebar" class="-mx-4 mt-8 flex-1 space-y-6 overflow-y-auto px-4">
-        @foreach (config('admin.nav') as $group)
-            @continue(collect($group['items'])->every(fn($i) => isset($i['can']) && !auth()->user()?->can($i['can'])))
+        @foreach (\App\Support\Navigation::for(auth()->user()) as $group)
             <div>
                 <p class="px-3 text-sm text-slate-500">{{ $group['title'] }}</p>
 

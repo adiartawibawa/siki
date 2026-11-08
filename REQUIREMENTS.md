@@ -48,6 +48,8 @@ Kolom Status: **Ada** (sudah dibuat), **Belum** (diputuskan, belum dikerjakan), 
 | U3 | Halaman error (401, 403, 404, 419, 429, 500, 503) | Ada |
 | U4 | Konfigurasi deploy | Belum |
 | U5 | API READ-only untuk integrasi data (disiapkan sederhana; detail per proyek) | Belum |
+| U6 | Halaman Showcase untuk developer: referensi komponen, cara memakai Core, pemeriksaan kesiapan; hanya di lingkungan local | Ada |
+| U7 | Sidebar hanya menampilkan menu yang route-nya ada dan boleh diakses pengguna | Ada |
 
 ## Non-fungsional
 

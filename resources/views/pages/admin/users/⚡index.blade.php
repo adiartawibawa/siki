@@ -17,8 +17,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Layout('layouts.app')] #[Title('Users')] class extends Component
-{
+new #[Layout('layouts.app')] #[Title('Users')] class extends Component {
     use Notifies, WithPagination;
 
     #[Url(except: '')]
@@ -57,17 +56,18 @@ new #[Layout('layouts.app')] #[Title('Users')] class extends Component
     #[Computed]
     public function users()
     {
-        return User::query()->visibleTo(Auth::user())
+        return User::query()
+            ->visibleTo(Auth::user())
             ->with('roles')
-            ->when($this->status === 'deleted', fn ($q) => $q->onlyTrashed())
-            ->when($this->status === 'all', fn ($q) => $q->withTrashed())
-            ->when($this->status === 'unverified', fn ($q) => $q->whereNull('email_verified_at'))
+            ->when($this->status === 'deleted', fn($q) => $q->onlyTrashed())
+            ->when($this->status === 'all', fn($q) => $q->withTrashed())
+            ->when($this->status === 'unverified', fn($q) => $q->whereNull('email_verified_at'))
             ->when(trim($this->search) !== '', function ($q) {
-                $term = '%'.trim($this->search).'%';
+                $term = '%' . trim($this->search) . '%';
 
-                $q->where(fn ($w) => $w->whereLike('first_name', $term)->orWhereLike('last_name', $term)->orWhereLike('username', $term)->orWhereLike('email', $term));
+                $q->where(fn($w) => $w->whereLike('first_name', $term)->orWhereLike('last_name', $term)->orWhereLike('username', $term)->orWhereLike('email', $term));
             })
-            ->when($this->roleFilter !== '' && in_array($this->roleFilter, $this->allRoles, true), fn ($q) => $q->role($this->roleFilter))
+            ->when($this->roleFilter !== '' && in_array($this->roleFilter, $this->allRoles, true), fn($q) => $q->role($this->roleFilter))
             ->orderBy('first_name')
             ->orderBy('username')
             ->paginate(10);
@@ -87,7 +87,7 @@ new #[Layout('layouts.app')] #[Title('Users')] class extends Component
         $actor = Auth::user();
 
         return Role::query()
-            ->when(! $actor->isSuperAdmin(), fn ($q) => $q->where('level', '<', $actor->level()))
+            ->when(!$actor->isSuperAdmin(), fn($q) => $q->where('level', '<', $actor->level()))
             ->orderByDesc('level')
             ->pluck('name', 'name')
             ->all();
@@ -145,7 +145,7 @@ new #[Layout('layouts.app')] #[Title('Users')] class extends Component
         ]);
 
         $role = Role::where('name', $data['role'])->where('guard_name', 'web')->firstOrFail();
-        $roleChanged = ! $editing || ! $editing->primaryRole()?->is($role);
+        $roleChanged = !$editing || !$editing->primaryRole()?->is($role);
 
         if ($roleChanged) {
             $editing ? $this->authorize('assignRole', [$editing, $role]) : $this->authorize('grantRole', [User::class, $role]);
@@ -300,7 +300,7 @@ new #[Layout('layouts.app')] #[Title('Users')] class extends Component
                     <td>
                         <div class="flex justify-end gap-1">
                             @if ($u->is($me))
-                                <x-ui.button variant="ghost" size="icon-sm" :href="route('account')"
+                                <x-ui.button variant="ghost" size="icon-sm" :href="route('account.details')"
                                     aria-label="Edit your account">
                                     <x-ui.icon name="user" size="sm" />
                                 </x-ui.button>

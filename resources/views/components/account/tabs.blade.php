@@ -1,7 +1,7 @@
 @php
     $tabs = [
         ['Profile', 'profile', 'user'],
-        ['Account', 'account', 'sliders-horizontal'],
+        ['Account', 'account.details', 'sliders-horizontal'],
         ['Security', 'account.security', 'shield-check'],
     ];
 @endphp

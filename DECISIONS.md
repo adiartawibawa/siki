@@ -85,6 +85,13 @@ Titik sambung tunggal: `User::scopeVisibleTo()` dan `User::isVisibleTo()`. Kedua
 **D22. Pengujian dengan Pest.** Disepakati.
 Matriks policy (aktor × target × aksi) harus lulus sebelum perubahan aturan digabung. Ubah tabelnya lebih dulu, baru kodenya.
 
+**D23. Menu sidebar disaring otomatis oleh `App\Support\Navigation`.** Disepakati.
+Item tampil hanya jika route-nya terdaftar, lolos `can`, dan flag `when` aktif; grup atau induk tanpa anak yang tampil ikut disembunyikan.
+Konsekuensi: menambah menu cukup menyunting `config/admin.php`; menu tanpa halaman tidak pernah menjadi tautan mati. Kekurangannya, salah ketik nama route membuat item hilang tanpa error, jadi pemeriksaan kesiapan di Showcase dan tes `Navigation` wajib dijaga.
+
+**D24. Halaman Showcase untuk developer, hanya di lingkungan local.** Disepakati.
+Dikendalikan `SHOWCASE_ENABLED` (default: aktif hanya bila `APP_ENV=local`); tidak terdaftar di production. Contoh komponen dirender dari kode yang sama dengan yang ditampilkan, sehingga perubahan API komponen langsung terlihat sebagai galat di halaman itu.
+
 ## Pertanyaan terbuka
 
 - **Q01.** Palet: kode memakai Tailwind murni dengan token `brand-*` (indigo, mengikuti referensi desain). Jika tema DaisyUI dengan primary merah masih dikehendaki, pilih salah satu; keduanya tidak boleh hidup bersamaan.

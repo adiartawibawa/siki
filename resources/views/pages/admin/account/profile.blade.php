@@ -41,7 +41,7 @@
             <div class="px-5 pb-6 sm:px-8">
                 <div class="-mt-10 flex flex-wrap items-end justify-between gap-4">
                     <x-ui.avatar :name="$user->name" size="xl" class="ring-4 ring-white" />
-                    <x-ui.button variant="dark" icon="user" :href="route('account')">Edit profile</x-ui.button>
+                    <x-ui.button variant="dark" icon="user" :href="route('account.details')">Edit profile</x-ui.button>
                 </div>
 
                 <h2 class="mt-4 text-2xl font-semibold tracking-tight text-slate-900">{{ $user->name }}</h2>
