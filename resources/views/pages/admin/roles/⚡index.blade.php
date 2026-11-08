@@ -1,20 +1,15 @@
 <?php
 
-use App\Enums\Ability;
-use App\Enums\UserRole;
+use App\Http\Requests\SaveRoleRequest;
 use App\Livewire\Concerns\Notifies;
 use App\Models\Role;
+use App\Services\RoleService;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
-use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Layout('layouts.app')] #[Title('Roles')] class extends Component
-{
+new #[Title('Roles')] class extends Component {
     use Notifies;
 
     public ?int $editingId = null;
@@ -27,6 +22,15 @@ new #[Layout('layouts.app')] #[Title('Roles')] class extends Component
 
     public array $permissions = [];
 
+    /** Aturan bisnis ada di service; komponen ini hanya mengurus state & tampilan. */
+    protected RoleService $roleService;
+
+    /** Livewire menyuntikkan dependensi lewat boot() pada setiap request. */
+    public function boot(RoleService $roleService): void
+    {
+        $this->roleService = $roleService;
+    }
+
     public function mount(): void
     {
         $this->authorize('viewAny', Role::class);
@@ -35,29 +39,21 @@ new #[Layout('layouts.app')] #[Title('Roles')] class extends Component
     #[Computed]
     public function roles()
     {
-        return Role::query()
-            ->withCount(['users', 'permissions'])
-            ->orderByDesc('level')
-            ->orderBy('name')
-            ->get();
+        return $this->roleService->list();
     }
 
     /** Hanya permission yang dipegang pengguna ini yang boleh dibagikan. */
     #[Computed]
     public function grantable(): array
     {
-        $actor = Auth::user();
-
-        return collect(Ability::cases())->map(fn (Ability $a) => $a->value)->filter(fn (string $p) => $actor->can($p))->values()->all();
+        return $this->roleService->grantableAbilities(Auth::user());
     }
 
     /** Level tertinggi yang boleh dibuat: selalu di bawah level pembuatnya. */
     #[Computed]
     public function maxLevel(): int
     {
-        $actor = Auth::user();
-
-        return $actor->isSuperAdmin() ? 99 : max(1, $actor->level() - 1);
+        return $this->roleService->maxLevel(Auth::user());
     }
 
     public function create(): void
@@ -89,48 +85,12 @@ new #[Layout('layouts.app')] #[Title('Roles')] class extends Component
 
         $editing ? $this->authorize('update', $editing) : $this->authorize('create', Role::class);
 
-        $data = $this->validate([
-            'name' => [
-                'required',
-                'string',
-                'min:2',
-                'max:50',
-                function ($attribute, $value, $fail) use ($editing) {
-                    $taken = Role::query()
-                        ->whereRaw('lower(name) = ?', [Str::lower($value)])
-                        ->when($editing, fn ($q) => $q->whereKeyNot($editing->id))
-                        ->exists();
+        // Aturan validasi dipakai ulang dari FormRequest yang sama dengan API.
+        $data = $this->validate(SaveRoleRequest::rulesFor(Auth::user(), $editing));
 
-                    if ($taken) {
-                        $fail('This role name is already in use.');
-                    }
-                },
-            ],
-            'description' => ['nullable', 'string', 'max:160'],
-            'level' => ['required', 'integer', 'between:1,'.$this->maxLevel],
-            'permissions' => ['array'],
-            'permissions.*' => ['string', Rule::in(array_map(fn (Ability $a) => $a->value, Ability::cases()))],
-        ]);
+        $this->roleService->save(Auth::user(), $editing, $data);
 
-        // Permission yang tidak dipegang pengguna ini tidak boleh ditambah, juga tidak boleh hilang diam-diam.
-        $kept = $editing ? $editing->permissions->pluck('name')->reject(fn ($p) => in_array($p, $this->grantable, true))->all() : [];
-        $chosen = array_values(array_intersect($data['permissions'], $this->grantable));
-
-        DB::transaction(function () use ($editing, $data, $kept, $chosen) {
-            $role = $editing ?? new Role(['guard_name' => 'web']);
-
-            $role
-                ->fill([
-                    'name' => trim($data['name']),
-                    'description' => $data['description'] ?: null,
-                    'level' => (int) $data['level'],
-                ])
-                ->save();
-
-            $role->syncPermissions(array_merge($kept, $chosen));
-        });
-
-        $this->notify('Role “'.trim($data['name']).($editing ? '” was updated.' : '” was created.'));
+        $this->notify('Role “' . trim($data['name']) . ($editing ? '” was updated.' : '” was created.'));
         $this->resetForm();
         $this->dispatch('modal-close-role-form');
     }
@@ -140,7 +100,7 @@ new #[Layout('layouts.app')] #[Title('Roles')] class extends Component
         $role = Role::findOrFail($id);
         $this->authorize('delete', $role);
 
-        $role->delete();
+        $this->roleService->delete($role);
 
         $this->notify("Role “{$role->name}” was deleted.");
     }
@@ -212,7 +172,7 @@ new #[Layout('layouts.app')] #[Title('Roles')] class extends Component
                                     wire:click="remove({{ $r->id }})"
                                     wire:confirm="Delete the role {{ $r->name }}?"
                                     aria-label="Delete {{ $r->name }}">
-                                    <x-ui.icon name="trash-2" size="sm" />
+                                    <x-ui.icon name="trash" size="sm" />
                                 </x-ui.button>
                             @endcan
                         </div>
