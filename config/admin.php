@@ -66,4 +66,9 @@ return [
     'account' => [
         'deletable' => true,
     ],
+
+    'api' => [
+        // Endpoint tulis tidak terdaftar bila false. Nyalakan hanya bila ada klien yang benar-benar butuh.
+        'writes' => env('ADMIN_API_WRITES', false),
+    ],
 ];

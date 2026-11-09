@@ -20,10 +20,10 @@ class RoleResource extends JsonResource
             'description' => $this->description,
             'level' => $this->level,
             'is_system' => $this->is_system,
-            // Hanya muncul bila relasi/count memang dimuat (menghindari N+1).
             'users_count' => $this->whenCounted('users'),
-            'permissions_count' => $this->whenCounted('permissions'),
-            'permissions' => $this->whenLoaded('permissions', fn () => $this->permissions->pluck('name')),
+            'permissions' => $this->whenLoaded('permissions', fn () => $this->permissions->pluck('name')->all()),
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
         ];
     }
 }

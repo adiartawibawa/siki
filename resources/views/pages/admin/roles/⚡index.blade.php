@@ -1,11 +1,16 @@
 <?php
 
-use App\Http\Requests\SaveRoleRequest;
+use App\Actions\Roles\DeleteRole;
+use App\Actions\Roles\SaveRole;
+use App\Enums\Ability;
+use App\Enums\UserRole;
+use App\Http\Requests\Roles\RoleRules;
 use App\Livewire\Concerns\Notifies;
 use App\Models\Role;
-use App\Services\RoleService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
@@ -20,16 +25,8 @@ new #[Title('Roles')] class extends Component {
 
     public string $level = '1';
 
+    /** @var list<string> */
     public array $permissions = [];
-
-    /** Aturan bisnis ada di service; komponen ini hanya mengurus state & tampilan. */
-    protected RoleService $roleService;
-
-    /** Livewire menyuntikkan dependensi lewat boot() pada setiap request. */
-    public function boot(RoleService $roleService): void
-    {
-        $this->roleService = $roleService;
-    }
 
     public function mount(): void
     {
@@ -37,23 +34,47 @@ new #[Title('Roles')] class extends Component {
     }
 
     #[Computed]
-    public function roles()
+    public function roles(): Collection
     {
-        return $this->roleService->list();
+        return Role::query()
+            ->withCount(['users', 'permissions'])
+            ->orderByDesc('level')
+            ->orderBy('name')
+            ->get();
     }
 
-    /** Hanya permission yang dipegang pengguna ini yang boleh dibagikan. */
+    /** Role yang sedang diedit, dengan jumlah pemegangnya. */
+    #[Computed]
+    public function editing(): ?Role
+    {
+        return $this->editingId ? Role::withCount('users')->find($this->editingId) : null;
+    }
+
+    /** Permission yang dipegang pengguna ini, jadi boleh dibagikan. */
     #[Computed]
     public function grantable(): array
     {
-        return $this->roleService->grantableAbilities(Auth::user());
+        return SaveRole::grantable(Auth::user());
     }
 
     /** Level tertinggi yang boleh dibuat: selalu di bawah level pembuatnya. */
     #[Computed]
     public function maxLevel(): int
     {
-        return $this->roleService->maxLevel(Auth::user());
+        return RoleRules::maxLevel(Auth::user());
+    }
+
+    /** @return Collection<string, Collection<int, Ability>> */
+    #[Computed]
+    public function abilityGroups(): Collection
+    {
+        return collect(Ability::cases())->groupBy(fn(Ability $a) => $a->group());
+    }
+
+    #[Computed]
+    public function levelReference(): string
+    {
+        return collect(UserRole::cases())->map(fn(UserRole $r) => $r->value . ' ' . $r->level())->join(' · ');
     }
 
     public function create(): void
@@ -62,6 +83,7 @@ new #[Title('Roles')] class extends Component {
 
         $this->resetForm();
         $this->level = (string) min(10, $this->maxLevel);
+
         $this->dispatch('modal-open-role-form');
     }
 
@@ -76,21 +98,24 @@ new #[Title('Roles')] class extends Component {
         $this->description = (string) $role->description;
         $this->level = (string) $role->level;
         $this->permissions = $role->permissions->pluck('name')->all();
+
         $this->dispatch('modal-open-role-form');
     }
 
     public function save(): void
     {
+        $actor = Auth::user();
         $editing = $this->editingId ? Role::findOrFail($this->editingId) : null;
 
-        $editing ? $this->authorize('update', $editing) : $this->authorize('create', Role::class);
+        // Otorisasi lebih dulu: yang tidak berhak tidak melihat galat validasi.
+        $this->authorize($editing ? 'update' : 'create', $editing ?? Role::class);
 
-        // Aturan validasi dipakai ulang dari FormRequest yang sama dengan API.
-        $data = $this->validate(SaveRoleRequest::rulesFor(Auth::user(), $editing));
+        $data = $this->validate(RoleRules::for($actor, $editing));
 
-        $this->roleService->save(Auth::user(), $editing, $data);
+        $role = app(SaveRole::class)->handle($actor, $editing, $data);
 
-        $this->notify('Role “' . trim($data['name']) . ($editing ? '” was updated.' : '” was created.'));
+        $this->notify('Role “' . $role->name . ($editing ? '” was updated.' : '” was created.'));
+
         $this->resetForm();
         $this->dispatch('modal-close-role-form');
     }
@@ -98,9 +123,8 @@ new #[Title('Roles')] class extends Component {
     public function remove(int $id): void
     {
         $role = Role::findOrFail($id);
-        $this->authorize('delete', $role);
 
-        $this->roleService->delete($role);
+        app(DeleteRole::class)->handle(Auth::user(), $role);
 
         $this->notify("Role “{$role->name}” was deleted.");
     }
@@ -113,18 +137,15 @@ new #[Title('Roles')] class extends Component {
 };
 ?>
 
-@php
-    $groups = collect(\App\Enums\Ability::cases())->groupBy(fn($a) => $a->group());
-    $reference = collect(\App\Enums\UserRole::cases())->map(fn($r) => $r->value . ' ' . $r->level())->join(' · ');
-@endphp
-
 <div class="space-y-4">
-
     <x-ui.card>
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h2 class="text-lg font-semibold text-slate-900">Roles</h2>
-                <p class="text-sm text-slate-500">Higher level means more authority over other accounts.</p>
+                <p class="max-w-[62ch] text-sm text-slate-500">
+                    Higher level means more authority over other accounts. System roles are locked, and a role that
+                    still has accounts cannot be deleted.
+                </p>
             </div>
 
             @can('create', \App\Models\Role::class)
@@ -189,34 +210,52 @@ new #[Title('Roles')] class extends Component {
 
             <div>
                 <x-form.input label="Level (1 to {{ $this->maxLevel }})" name="level" type="number" min="1"
-                    max="{{ $this->maxLevel }}" wire:model="level" required />
+                    max="{{ $this->maxLevel }}" wire:model.live="level" required />
                 <p class="mt-1.5 text-xs leading-relaxed text-slate-500">
-                    Accounts can only be managed by someone with a higher level. For reference: {{ $reference }}.
+                    Accounts can only be managed by someone with a higher level. For reference:
+                    {{ $this->levelReference }}.
                 </p>
             </div>
 
+            @if ($this->editing && $this->editing->users_count > 0 && (int) $level !== $this->editing->level)
+                <x-ui.alert tone="warning">
+                    {{ $this->editing->users_count }} {{ Str::plural('account', $this->editing->users_count) }}
+                    hold this role. Changing the level changes which accounts they can manage.
+                </x-ui.alert>
+            @endif
+
             <fieldset>
                 <legend class="mb-1.5 text-xs font-medium text-slate-600">Permissions</legend>
+
                 <div class="max-h-56 space-y-4 overflow-y-auto rounded-xl border border-slate-200 p-3">
-                    @foreach ($groups as $group => $abilities)
+                    @foreach ($this->abilityGroups as $group => $abilities)
                         <div>
                             <p class="text-xs font-semibold text-slate-500">{{ $group }}</p>
                             <div class="mt-2 space-y-2">
-                                @foreach ($abilities as $a)
-                                    @php $can = in_array($a->value, $this->grantable, true); @endphp
+                                @foreach ($abilities as $ability)
+                                    @php $can = in_array($ability->value, $this->grantable, true); @endphp
                                     <label
                                         class="{{ $can ? 'text-slate-800' : 'text-slate-400' }} flex items-center gap-2.5 text-sm">
-                                        <input type="checkbox" value="{{ $a->value }}" wire:model="permissions"
+                                        <input type="checkbox" value="{{ $ability->value }}" wire:model="permissions"
                                             @disabled(!$can) class="size-4 rounded accent-brand-600">
-                                        {{ $a->label() }}
+                                        {{ $ability->label() }}
                                     </label>
                                 @endforeach
                             </div>
                         </div>
                     @endforeach
                 </div>
-                <p class="mt-1.5 text-xs text-slate-500">Greyed-out permissions are ones you don’t hold yourself, so you
-                    can’t hand them out.</p>
+
+                @error('permissions')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
+                @error('permissions.*')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                @enderror
+
+                <p class="mt-1.5 text-xs text-slate-500">
+                    Greyed-out permissions are ones you don’t hold yourself, so you can’t hand them out or remove them.
+                </p>
             </fieldset>
 
             <div class="flex justify-end gap-2 pt-1">

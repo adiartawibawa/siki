@@ -12,6 +12,8 @@ enum Ability: string
     case ViewRoles = 'roles.view';
     case ManageRoles = 'roles.manage';
     case ManageSettings = 'manage-settings';
+    case ApiAccess = 'api.access';
+    case ManageApiTokens = 'api.tokens.manage';
 
     public function label(): string
     {
@@ -24,6 +26,8 @@ enum Ability: string
             self::ViewRoles => 'View roles',
             self::ManageRoles => 'Create and edit roles',
             self::ManageSettings => 'Change application settings',
+            self::ApiAccess => 'Use the API with personal tokens',
+            self::ManageApiTokens => 'Revoke API tokens of other accounts',
         };
     }
 
@@ -33,6 +37,13 @@ enum Ability: string
             self::ViewUsers, self::CreateUsers, self::UpdateUsers, self::DeleteUsers, self::RestoreUsers => 'Users',
             self::ViewRoles, self::ManageRoles => 'Roles',
             self::ManageSettings => 'Settings',
+            self::ApiAccess, self::ManageApiTokens => 'API',
         };
+    }
+
+    /** @return list<string> */
+    public static function values(): array
+    {
+        return array_map(fn (self $a) => $a->value, self::cases());
     }
 }

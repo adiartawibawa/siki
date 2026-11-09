@@ -2,8 +2,18 @@
 
 namespace App\Models;
 
+use Illuminate\Support\Carbon;
 use Spatie\Permission\Models\Role as SpatieRole;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property string|null $description
+ * @property int $level
+ * @property bool $is_system
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ */
 class Role extends SpatieRole
 {
     protected function casts(): array

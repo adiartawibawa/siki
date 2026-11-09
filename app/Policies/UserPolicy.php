@@ -16,7 +16,12 @@ class UserPolicy
 
     public function view(User $actor, User $target): bool
     {
-        return $this->viewAny($actor);
+        return $this->viewAny($actor) && $target->isVisibleTo($actor);
+    }
+
+    public function manageTokens(User $actor, User $target): bool
+    {
+        return $actor->can(Ability::ManageApiTokens->value) && $this->manages($actor, $target);
     }
 
     public function create(User $actor): bool

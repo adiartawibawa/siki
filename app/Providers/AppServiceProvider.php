@@ -7,12 +7,18 @@ use App\Models\User;
 use App\Settings\GeneralSettings;
 use App\Settings\MailSettings;
 use Carbon\CarbonImmutable;
+use Dedoc\Scramble\Scramble;
+use Dedoc\Scramble\Support\Generator\OpenApi;
+use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -47,6 +53,15 @@ class AppServiceProvider extends ServiceProvider
         $this->applySettings();
 
         Event::listen(Login::class, fn () => session()->forget('promo.dismissed'));
+
+        // Di luar local, dokumentasi hanya untuk Super Admin. Tipe ?User wajib agar tamu tidak melempar galat.
+        Gate::define('viewApiDocs', fn (?User $user) => $user?->isSuperAdmin() ?? false);
+
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)->by($request->user()?->getAuthIdentifier() ?: $request->ip()));
+
+        Scramble::configure()->withDocumentTransformers(function (OpenApi $openApi) {
+            $openApi->secure(SecurityScheme::http('bearer'));
+        });
     }
 
     /**

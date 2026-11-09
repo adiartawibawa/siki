@@ -1,8 +1,11 @@
 @php
+    $user = auth()->user();
     $tabs = [
         ['Profile', 'profile', 'user'],
         ['Account', 'account.details', 'sliders-horizontal'],
         ['Security', 'account.security', 'shield-check'],
+        // Tampil bagi yang berhak, atau yang masih punya token untuk dibersihkan.
+        $user && ($user->can('api.access') || $user->tokens()->exists()) ? ['API', 'account.api', 'key-round'] : null,
     ];
 @endphp
 

@@ -37,6 +37,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         return response()->noContent();
     })->name('promo.dismiss');
+
+    Route::livewire('/account/api', 'pages::admin.account.api')->name('account.api');
 });
 
 /*

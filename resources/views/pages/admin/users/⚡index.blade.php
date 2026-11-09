@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\Api\RevokeApiTokens;
+use App\Enums\Ability;
 use App\Enums\UserRole;
 use App\Livewire\Concerns\Notifies;
 use App\Models\Role;
@@ -161,6 +163,10 @@ new #[Layout('layouts.app')] #[Title('Users')] class extends Component {
                 if ($roleChanged) {
                     $editing->syncRoles([$role]);
                 }
+
+                if ($roleChanged && !$editing->fresh()->can(Ability::ApiAccess->value)) {
+                    $editing->tokens()->delete(); // kehilangan izin API = token tidak dibiarkan menunggu
+                }
             });
 
             $this->notify("{$editing->name} was updated.");
@@ -192,6 +198,7 @@ new #[Layout('layouts.app')] #[Title('Users')] class extends Component {
 
         // Mencabut token "ingat saya"; sesi aktif gugur sendiri karena akun yang terhapus tidak lagi dimuat.
         $user->forceFill(['remember_token' => Str::random(60)])->save();
+        $user->tokens()->delete();
         $user->delete();
         $this->notify("{$user->name} was deactivated and can no longer log in.");
     }
@@ -209,6 +216,15 @@ new #[Layout('layouts.app')] #[Title('Users')] class extends Component {
     {
         $this->reset('editingId', 'first_name', 'last_name', 'username', 'email', 'role');
         $this->resetValidation();
+    }
+
+    public function revokeTokens(string $id): void
+    {
+        $user = User::findOrFail($id);
+
+        $count = app(RevokeApiTokens::class)->handle(Auth::user(), $user);
+
+        $this->notify("{$count} API " . Str::plural('token', $count) . " revoked for {$user->name}.");
     }
 };
 ?>
@@ -304,6 +320,16 @@ new #[Layout('layouts.app')] #[Title('Users')] class extends Component {
                                     aria-label="Edit your account">
                                     <x-ui.icon name="user" size="sm" />
                                 </x-ui.button>
+                                @if ($u->tokens_count > 0)
+                                    @can('manageTokens', $u)
+                                        <x-ui.button variant="ghost" size="icon-sm" class="text-amber-600 hover:bg-amber-50"
+                                            wire:click="revokeTokens('{{ $u->id }}')"
+                                            wire:confirm="Revoke {{ $u->tokens_count }} API {{ Str::plural('token', $u->tokens_count) }} for {{ $u->name }}?"
+                                            aria-label="Revoke API tokens for {{ $u->name }}">
+                                            <x-ui.icon name="key-round" size="sm" />
+                                        </x-ui.button>
+                                    @endcan
+                                @endif
                             @elseif ($u->trashed())
                                 @can('restore', $u)
                                     <x-ui.button variant="ghost" size="icon-sm" wire:click="restore('{{ $u->id }}')"
