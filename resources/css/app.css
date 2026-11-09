@@ -18,6 +18,19 @@
     --color-brand-800: #3730a3;
 
     --color-canvas: #f3f3f7;
+
+    --animate-plate-in: plate-in 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+    @keyframes plate-in {
+        from {
+            transform: translateY(0) rotateX(62deg) rotateZ(45deg);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(var(--y)) rotateX(62deg) rotateZ(45deg);
+            opacity: 1;
+        }
+    }
 }
 
 [x-cloak] {
