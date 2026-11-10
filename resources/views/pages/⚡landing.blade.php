@@ -1,5 +1,6 @@
 <?php
 
+use App\Settings\GeneralSettings;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -12,7 +13,9 @@ new #[Layout('layouts.guest')] #[Title('Boilerplate TALL Stack')] class extends 
      */
     public function mount()
     {
-        if (!config('starter.landing')) {
+        $isLandingPage = rescue(fn() => app(GeneralSettings::class)->landing_enabled, false, false);
+
+        if (!$isLandingPage) {
             // Ganti 'dashboard' dengan nama route beranda aplikasi setelah login.
             return $this->redirectRoute(auth()->check() ? 'dashboard' : 'login');
         }
@@ -188,7 +191,11 @@ new #[Layout('layouts.guest')] #[Title('Boilerplate TALL Stack')] class extends 
                 <nav aria-label="Navigasi mobile" class="flex flex-col gap-4 text-base">
                     <a href="#fitur" @click="menu = false">Fitur</a>
                     <a href="#faq" @click="menu = false">FAQ</a>
-                    <a href="{{ $loginUrl }}" class="font-medium">Masuk</a>
+                    @auth
+                        <a href="{{ $dashboardUrl }}" class="font-medium">Dashboard</a>
+                    @else
+                        <a href="{{ $loginUrl }}" class="font-medium">Masuk</a>
+                    @endauth
                 </nav>
             </div>
         </header>

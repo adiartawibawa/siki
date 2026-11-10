@@ -16,6 +16,8 @@ class GeneralSettings extends Settings
 
     public string $locale;
 
+    public bool $landing_enabled;
+
     public bool $registration_enabled;
 
     public static function group(): string

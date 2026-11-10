@@ -18,6 +18,8 @@ new #[Layout('layouts.app')] #[Title('General settings')] class extends Componen
 
     public string $locale = 'en';
 
+    public bool $landing_enabled = false;
+
     public bool $registration_enabled = false;
 
     public function mount(GeneralSettings $settings): void
@@ -29,6 +31,7 @@ new #[Layout('layouts.app')] #[Title('General settings')] class extends Componen
         $this->contact_email = $settings->contact_email;
         $this->timezone = $settings->timezone;
         $this->locale = $settings->locale;
+        $this->landing_enabled = $settings->landing_enabled;
         $this->registration_enabled = $settings->registration_enabled;
     }
 
@@ -56,6 +59,7 @@ new #[Layout('layouts.app')] #[Title('General settings')] class extends Componen
             'contact_email' => ['required', 'email', 'max:255'],
             'timezone' => ['required', Rule::in(\DateTimeZone::listIdentifiers())],
             'locale' => ['required', Rule::in(array_keys($this->locales))],
+            'landing_enabled' => ['boolean'],
             'registration_enabled' => ['boolean'],
         ]);
 
@@ -64,6 +68,7 @@ new #[Layout('layouts.app')] #[Title('General settings')] class extends Componen
         $settings->contact_email = $data['contact_email'];
         $settings->timezone = $data['timezone'];
         $settings->locale = $data['locale'];
+        $settings->landing_enabled = $data['landing_enabled'];
         $settings->registration_enabled = $data['registration_enabled'];
         $settings->save();
 
@@ -92,6 +97,12 @@ new #[Layout('layouts.app')] #[Title('General settings')] class extends Componen
                     <x-form.select label="Language" name="locale" wire:model="locale" :options="$this->locales" />
                     <x-form.select label="Display timezone" name="timezone" wire:model="timezone" :options="$this->timezones" />
                 </div>
+            </x-form.form-section>
+
+            <x-form.form-section title="Landing page"
+                description="Control whether the public landing page is shown to visitors." class="p-6 sm:p-8">
+                <x-form.toggle label="Enable landing page" wire:model="landing_enabled"
+                    description="When off, visitors are redirected to the login page instead of seeing the landing page." />
             </x-form.form-section>
 
             <x-form.form-section title="Access" description="Who can create an account." class="p-6 sm:p-8">

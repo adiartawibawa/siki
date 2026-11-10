@@ -11,6 +11,7 @@ return new class extends SettingsMigration
         $this->migrator->add('general.contact_email', 'admin@example.com');
         $this->migrator->add('general.timezone', 'UTC');
         $this->migrator->add('general.locale', 'en');
+        $this->migrator->add('general.landing_enabled', true);
         $this->migrator->add('general.registration_enabled', false);
     }
 };
