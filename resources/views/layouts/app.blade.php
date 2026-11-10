@@ -30,9 +30,22 @@
 
             <div class="min-w-0 space-y-4">
                 <x-admin.topbar :title="$title ?? 'Overview'" />
+
                 <main id="main" class="space-y-4">
                     {{ $slot }}
                 </main>
+
+                <footer class="flex flex-col items-center mx-auto w-full mt-24">
+                    <div class="w-full max-w-6xl px-6 py-4 border-t border-gray-200/70 flex flex-col items-center gap-4">
+                        <a href="/"
+                            class="text-lg font-medium tracking-[0.35em] uppercase text-gray-400 hover:text-gray-500 transition-colors">
+                            PRADStudio
+                        </a>
+                        <p class="text-xs text-gray-300 tracking-wide">
+                            Crafted with care &copy; {{ date('Y') }} — All rights reserved.
+                        </p>
+                    </div>
+                </footer>
             </div>
         </div>
     </div>

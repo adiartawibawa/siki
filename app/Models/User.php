@@ -82,13 +82,20 @@ class User extends Authenticatable implements MustVerifyEmail
     /** Hook untuk aplikasi turunan: batasi akun yang terlihat oleh $actor (mis. per unit). Core: semua. */
     public function scopeVisibleTo(Builder $query, User $actor): void
     {
-        // sengaja kosong di Core
+        // Super Admin melihat semua akun, tidak perlu dibatasi
+        if ($actor->isSuperAdmin()) {
+            return;
+        }
+
+        // Selain Super Admin: sembunyikan semua akun yang memiliki role Super Admin
+        $query->whereDoesntHave('roles', fn (Builder $roles) => $roles->where('name', UserRole::SuperAdmin->value));
     }
 
     /** Pasangan scope di atas untuk satu akun. Keduanya harus selalu konsisten. */
     public function isVisibleTo(User $actor): bool
     {
-        return true;
+        // Terlihat jika actor adalah Super Admin, atau akun ini bukan Super Admin
+        return $actor->isSuperAdmin() || ! $this->isSuperAdmin();
     }
 
     /**

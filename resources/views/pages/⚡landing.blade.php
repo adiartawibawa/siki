@@ -5,10 +5,6 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-/**
- * Halaman landing publik untuk boilerplate TALL Stack (Single File Component).
- * Memakai layout 'layouts.guest' (yang meng-extend 'layouts.base').
- */
 new #[Layout('layouts.guest')] #[Title('Boilerplate TALL Stack')] class extends Component {
     /**
      * Bila landing dinonaktifkan lewat config('starter.landing'), pengunjung
@@ -59,6 +55,8 @@ new #[Layout('layouts.guest')] #[Title('Boilerplate TALL Stack')] class extends 
 {{-- Livewire mewajibkan satu elemen root --}}
 <div>
     @php
+        $dashboardUrl = route('dashboard');
+
         $loginUrl = Route::has('login') ? route('login') : '#';
 
         // Pendaftaran publik default tertutup (Settings). Tautan daftar hanya dipakai bila benar-benar dibuka,
@@ -167,8 +165,13 @@ new #[Layout('layouts.guest')] #[Title('Boilerplate TALL Stack')] class extends 
             </nav>
 
             <div class="flex items-center gap-3">
-                <a href="{{ $loginUrl }}"
-                    class="{{ $btn }} border border-slate-300 text-slate-900 hover:bg-slate-900 hover:text-white max-lg:hidden">Masuk</a>
+                @auth
+                    <a href="{{ $dashboardUrl }}"
+                        class="{{ $btn }} border border-slate-300 text-slate-900 hover:bg-slate-900 hover:text-white max-lg:hidden">Dashboard</a>
+                @else
+                    <a href="{{ $loginUrl }}"
+                        class="{{ $btn }} border border-slate-300 text-slate-900 hover:bg-slate-900 hover:text-white max-lg:hidden">Masuk</a>
+                @endauth
 
                 <button type="button" @click="menu = !menu" :aria-expanded="menu" aria-controls="menu-mobile"
                     aria-label="Buka menu"
