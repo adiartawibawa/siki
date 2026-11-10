@@ -1,5 +1,8 @@
 <?php
 
+use App\Search\RoleSearch;
+use App\Search\UserSearch;
+
 /*
 |--------------------------------------------------------------------------
 | Navigasi sidebar
@@ -45,6 +48,11 @@ return [
                 ['label' => 'Showcase', 'icon' => 'book-open', 'route' => 'showcase', 'when' => 'admin.showcase'],
             ],
         ],
+    ],
+
+    'search' => [
+        UserSearch::class,
+        RoleSearch::class,
     ],
 
     // Hanya aktif di lingkungan local. Di staging atau production harus dinyalakan dengan sadar.

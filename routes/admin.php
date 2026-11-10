@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\SearchController;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
@@ -37,6 +38,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         return response()->noContent();
     })->name('promo.dismiss');
+
+    Route::get('/search', SearchController::class)->middleware('throttle:120,1')->name('search');
 
     Route::livewire('/account/api', 'pages::admin.account.api')->name('account.api');
 });

@@ -14,9 +14,13 @@
 
     <h1 class="text-lg font-semibold text-slate-900">{{ $title }}</h1>
 
-    <div class="mx-auto hidden w-full max-w-md md:block">
-        <x-ui.search placeholder="Search anything…" shortcut />
-    </div>
+    @if (config('admin.search'))
+        <div class="mx-auto hidden w-full max-w-md md:block">
+            <x-admin.search />
+        </div>
+    @else
+        <div class="hidden flex-1 md:block"></div>
+    @endif
 
     <div class="ml-auto flex items-center gap-2 md:ml-0">
         <x-ui.button variant="outline" size="icon" pill aria-label="Help">
