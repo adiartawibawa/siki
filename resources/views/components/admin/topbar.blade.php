@@ -1,4 +1,4 @@
-@props(['title' => 'Overview', 'unread' => false])
+@props(['title' => 'Overview'])
 
 @php
     $user = auth()->user();
@@ -27,12 +27,7 @@
             <x-ui.icon name="circle-question-mark" size="sm" />
         </x-ui.button>
 
-        <x-ui.button variant="outline" size="icon" pill aria-label="Notifications" class="relative">
-            <x-ui.icon name="bell" size="sm" />
-            @if ($unread)
-                <span class="absolute right-2.5 top-2.5 size-2 rounded-full bg-red-500 ring-2 ring-white"></span>
-            @endif
-        </x-ui.button>
+        <x-admin.notifications />
 
         <x-ui.dropdown width="w-56"
             trigger-class="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-2 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:pr-3">

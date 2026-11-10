@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SearchController;
 use App\Models\Role;
 use App\Models\User;
@@ -42,6 +43,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/search', SearchController::class)->middleware('throttle:120,1')->name('search');
 
     Route::livewire('/account/api', 'pages::admin.account.api')->name('account.api');
+
+    Route::middleware('throttle:60,1')->group(function () {
+        Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+        Route::get('/notifications/{notification}', [NotificationController::class, 'show'])->name('notifications.show');
+    });
 });
 
 /*

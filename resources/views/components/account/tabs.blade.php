@@ -7,6 +7,8 @@
         // Tampil bagi yang berhak, atau yang masih punya token untuk dibersihkan.
         $user && ($user->can('api.access') || $user->tokens()->exists()) ? ['API', 'account.api', 'book-key'] : null,
     ];
+    // Buang tab yang tidak ditampilkan (null) agar tidak ikut di-loop dan memanggil route(null)
+    $tabs = array_filter($tabs);
 @endphp
 
 <nav aria-label="Account" class="flex gap-1 overflow-x-auto rounded-2xl bg-white p-1.5 ring-1 ring-slate-200/70">

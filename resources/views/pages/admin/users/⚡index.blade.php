@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Api\RevokeApiTokens;
+use App\Actions\Users\ChangeRole;
 use App\Enums\Ability;
 use App\Enums\UserRole;
 use App\Livewire\Concerns\Notifies;
@@ -166,7 +167,7 @@ new #[Layout('layouts.app')] #[Title('Users')] class extends Component
                 $editing->fill($attributes)->save();
 
                 if ($roleChanged) {
-                    $editing->syncRoles([$role]);
+                    app(ChangeRole::class)->handle(Auth::user(), $editing, $role);
                 }
 
                 if ($roleChanged && ! $editing->fresh()->can(Ability::ApiAccess->value)) {

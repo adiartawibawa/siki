@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Enums\Ability;
 use App\Models\User;
+use App\Notifications\AccountNotice;
 use App\Settings\GeneralSettings;
 use App\Settings\MailSettings;
 use Carbon\CarbonImmutable;
@@ -22,6 +23,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Fortify\Events\TwoFactorAuthenticationDisabled;
 use Spatie\LaravelSettings\Exceptions\MissingSettings;
 
 class AppServiceProvider extends ServiceProvider
@@ -61,6 +63,17 @@ class AppServiceProvider extends ServiceProvider
 
         Scramble::configure()->withDocumentTransformers(function (OpenApi $openApi) {
             $openApi->secure(SecurityScheme::http('bearer'));
+        });
+
+        // Hanya bila 2FA yang sudah terkonfirmasi dimatikan. Membatalkan pemasangan yang belum selesai
+        // juga memicu event ini, tetapi two_factor_confirmed_at tidak berubah, jadi tidak diberitahukan.
+        Event::listen(TwoFactorAuthenticationDisabled::class, function ($event) {
+            if ($event->user->wasChanged('two_factor_confirmed_at')) {
+                $event->user->notify(new AccountNotice(
+                    'Two-factor authentication was turned off.',
+                    route('account.security', absolute: false),
+                ));
+            }
         });
     }
 

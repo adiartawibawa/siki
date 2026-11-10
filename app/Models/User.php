@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\UserRole;
+use App\Notifications\AccountNotice;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -96,6 +97,14 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         // Terlihat jika actor adalah Super Admin, atau akun ini bukan Super Admin
         return $actor->isSuperAdmin() || ! $this->isSuperAdmin();
+    }
+
+    /** Satu-satunya jalur mengganti password; pemiliknya diberi tahu. */
+    public function changePassword(string $plain): void
+    {
+        $this->forceFill(['password' => $plain])->save(); // cast 'hashed' yang meng-hash
+
+        $this->notify(new AccountNotice('Your password was changed.', route('account.security', absolute: false)));
     }
 
     /**

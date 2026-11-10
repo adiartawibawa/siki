@@ -3,7 +3,9 @@
 namespace App\Actions\Api;
 
 use App\Models\User;
+use App\Notifications\AccountNotice;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 
 final class RevokeApiTokens
 {
@@ -21,6 +23,16 @@ final class RevokeApiTokens
             $query->whereKey($tokenId);
         }
 
-        return $query->delete();
+        $count = $query->delete();
+
+        // Hanya bila orang lain yang mencabut; mencabut milik sendiri tidak perlu diberitahukan.
+        if ($count > 0 && $actor->isNot($owner)) {
+            $owner->notify(new AccountNotice(
+                $count.' API '.Str::plural('token', $count).' '.($count === 1 ? 'was' : 'were').' revoked by an administrator.',
+                route('account.api', absolute: false),
+            ));
+        }
+
+        return $count;
     }
 }

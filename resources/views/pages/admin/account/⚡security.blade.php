@@ -36,9 +36,7 @@ new #[Layout('layouts.app')] #[Title('Security')] class extends Component
             'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
-        Auth::user()
-            ->forceFill(['password' => Hash::make($this->password)])
-            ->save();
+        Auth::user()->changePassword($this->password);
 
         $this->reset('current_password', 'password', 'password_confirmation');
         $this->dispatch('password-saved');
