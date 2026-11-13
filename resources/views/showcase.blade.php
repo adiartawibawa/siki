@@ -6,15 +6,45 @@
         'menu' => 'Menu sidebar',
         'halaman' => 'Halaman baru',
         'otorisasi' => 'Otorisasi',
+        'api' => 'API',
+        'pencarian' => 'Pencarian global',
+        'notifikasi' => 'Notifikasi',
         'setelan' => 'Setelan aplikasi',
         'komponen' => 'Komponen UI',
-        'notifikasi' => 'Notifikasi',
         'turunan' => 'Aplikasi turunan',
         'rilis' => 'Sebelum rilis',
     ];
 
-    // Rute di config/admin.php yang tidak terdaftar (item yang dimatikan 'when' tidak dihitung).
-    $missingRoutes = collect(config('admin.nav'))
+    // Kelas pembantu agar markup di bawah tetap pendek.
+    $c = 'rounded bg-slate-100 px-1 text-xs';
+    $ul = 'list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-slate-700';
+
+    $abilities = array_map(fn($a) => $a->value, \App\Enums\Ability::cases());
+    $roleNames = array_map(fn($r) => $r->value, \App\Enums\UserRole::cases());
+
+    // Route inti yang dirujuk kode Core. Salah satu hilang = tautan atau tombol yang error.
+    $coreRoutes = [
+        'login',
+        'logout',
+        'password.request',
+        'dashboard',
+        'profile',
+        'account.details',
+        'account.security',
+        'account.api',
+        'settings.general',
+        'settings.mail',
+        'users.index',
+        'roles.index',
+        'search',
+        'notifications.index',
+        'notifications.read-all',
+        'notifications.show',
+    ];
+    $missingCore = collect($coreRoutes)->reject(fn($r) => Route::has($r))->values();
+
+    // Route di config/admin.php yang tidak terdaftar (item yang dimatikan 'when' tidak dihitung).
+    $missingNav = collect(config('admin.nav'))
         ->pluck('items')
         ->flatten(1)
         ->flatMap(fn($i) => $i['children'] ?? [$i])
@@ -24,8 +54,18 @@
         ->reject(fn($r) => Route::has($r))
         ->values();
 
-    $abilities = array_map(fn($a) => $a->value, \App\Enums\Ability::cases());
-    $roleNames = array_map(fn($r) => $r->value, \App\Enums\UserRole::cases());
+    // Sumber pencarian di config yang bukan turunan SearchSource.
+    $badSources = collect(config('admin.search', []))
+        ->reject(fn($class) => is_subclass_of($class, \App\Search\SearchSource::class))
+        ->values();
+
+    $columnIsNotInt = fn(string $table, string $column) => !str_contains(
+        strtolower(
+            collect(\Illuminate\Support\Facades\Schema::getColumns($table))->firstWhere('name', $column)['type_name'] ??
+                'int',
+        ),
+        'int',
+    );
 
     // [label, uji, petunjuk]. Uji yang melempar exception dianggap gagal.
     $checks = [
@@ -42,16 +82,18 @@
         ],
         [
             'Pivot Spatie memakai UUID (model_has_roles.model_id)',
-            fn() => !str_contains(
-                strtolower(
-                    collect(\Illuminate\Support\Facades\Schema::getColumns('model_has_roles'))->firstWhere(
-                        'name',
-                        'model_id',
-                    )['type_name'] ?? 'int',
-                ),
-                'int',
-            ),
+            fn() => $columnIsNotInt('model_has_roles', 'model_id'),
             'Ubah model_morph_key menjadi uuid di migrasi Spatie sebelum migrate',
+        ],
+        [
+            'Token API memakai UUID (personal_access_tokens.tokenable_id)',
+            fn() => $columnIsNotInt('personal_access_tokens', 'tokenable_id'),
+            'Ganti morphs("tokenable") menjadi uuidMorphs("tokenable") di migrasi Sanctum sebelum migrate',
+        ],
+        [
+            'Notifikasi memakai UUID (notifications.notifiable_id)',
+            fn() => $columnIsNotInt('notifications', 'notifiable_id'),
+            'Pakai uuidMorphs("notifiable") di migrasi notifications',
         ],
         [
             'Tabel setelan ada dan terisi',
@@ -65,10 +107,31 @@
             'Jalankan migrasi Fortify untuk kolom two_factor_*',
         ],
         [
+            'fortify.username adalah kolom nyata di users',
+            fn() => \Illuminate\Support\Facades\Schema::hasColumn('users', (string) config('fortify.username')),
+            'Fortify membaca $user->{username} saat konfirmasi password. Biarkan "email"; login dengan username ditangani authenticateUsing',
+        ],
+        ['Route inti terdaftar', fn() => $missingCore->isEmpty(), 'Belum terdaftar: ' . $missingCore->implode(', ')],
+        [
             'Semua route di config/admin.php terdaftar',
-            fn() => $missingRoutes->isEmpty(),
+            fn() => $missingNav->isEmpty(),
             'Item tanpa route disembunyikan otomatis, jadi salah ketik tidak menimbulkan error. Belum terdaftar: ' .
-            $missingRoutes->implode(', '),
+            $missingNav->implode(', '),
+        ],
+        [
+            'Sumber pencarian di config valid',
+            fn() => $badSources->isEmpty(),
+            'Harus turunan App\Search\SearchSource. Bermasalah: ' . $badSources->implode(', '),
+        ],
+        [
+            'Token API punya masa berlaku (sanctum.expiration)',
+            fn() => config('sanctum.expiration') !== null,
+            'Bawaan Sanctum: token tidak pernah kedaluwarsa. Set SANCTUM_EXPIRATION (menit)',
+        ],
+        [
+            'Endpoint tulis API tidak aktif di production',
+            fn() => !(app()->isProduction() && config('admin.api.writes')),
+            'Set ADMIN_API_WRITES=false kecuali ada klien yang benar-benar butuh',
         ],
         [
             'APP_TIMEZONE = UTC',
@@ -96,6 +159,7 @@
         ],
     ];
 
+    // Potongan yang memuat tag PHP ditulis sebagai string di sini.
     $sfc = <<<'CODE'
     <?php
     
@@ -118,7 +182,7 @@
             // Setiap aksi adalah request tersendiri: otorisasi ulang di sini.
             $this->authorize('update', $contoh);
     
-            // ... simpan ...
+            // ... panggil Action, bukan menulis logika di komponen ...
     
             $this->notify('Tersimpan.');
         }
@@ -137,12 +201,10 @@
         <p class="mt-2 max-w-[70ch] text-sm leading-relaxed text-slate-600">
             Pengingat untuk developer saat memakai Core membuat aplikasi tertentu. Contoh komponen di sini dirender
             dari kode yang sama dengan yang ditampilkan, jadi kalau API sebuah komponen berubah, bagian itu akan
-            menampilkan galat. Keputusan dan alasannya ada di <code
-                class="rounded bg-slate-100 px-1.5 py-0.5 text-xs">DECISIONS.md</code>,
-            kebutuhan di <code class="rounded bg-slate-100 px-1.5 py-0.5 text-xs">REQUIREMENTS.md</code>.
-            Halaman ini hanya terdaftar bila <code
-                class="rounded bg-slate-100 px-1.5 py-0.5 text-xs">SHOWCASE_ENABLED</code> aktif (bawaan: lingkungan
-            local).
+            menampilkan galat. Keputusan dan alasannya ada di <code class="{{ $c }}">DECISIONS.md</code>,
+            kebutuhan di <code class="{{ $c }}">REQUIREMENTS.md</code>.
+            Halaman ini hanya terdaftar bila <code class="{{ $c }}">SHOWCASE_ENABLED</code> aktif (bawaan:
+            lingkungan local).
         </p>
 
         <nav aria-label="Daftar isi" class="mt-5 flex flex-wrap gap-2">
@@ -192,15 +254,19 @@
                     ./vendor/bin/pest # semua tes harus lulus sebelum mulai mengubah aturan
                 @endverbatim
         </x-showcase.code>
-        <ul class="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-slate-700">
-            <li>Migrasi pivot Spatie harus memakai <code class="rounded bg-slate-100 px-1 text-xs">uuid</code> sebelum
-                <code class="rounded bg-slate-100 px-1 text-xs">migrate</code> (lihat pemeriksaan di atas).
-            </li>
+        <ul class="{{ $ul }}">
+            <li>Migrasi pihak ketiga yang memakai <code class="{{ $c }}">morphs()</code> (Spatie, Sanctum,
+                notifikasi) harus diubah ke <code class="{{ $c }}">uuid</code> sebelum <code
+                    class="{{ $c }}">migrate</code>. Pemeriksaan di atas memeriksanya satu per satu.</li>
             <li>Seeder membuat role sistem sekali dan tidak menimpa hasil edit di UI. <code
-                    class="rounded bg-slate-100 px-1 text-xs">Ability</code> baru tidak otomatis sampai ke Admin atau
-                Operator.</li>
+                    class="{{ $c }}">Ability</code> baru tidak otomatis sampai ke Admin atau Operator.</li>
             <li>Pendaftaran publik default tertutup. Akun dibuat admin dan memilih password sendiri lewat tautan di
                 email.</li>
+            <li>Token API tidak punya masa berlaku bawaan: set <code
+                    class="{{ $c }}">SANCTUM_EXPIRATION</code>. Endpoint tulis API mati sampai <code
+                    class="{{ $c }}">ADMIN_API_WRITES=true</code>.</li>
+            <li>Pembersihan notifikasi berjalan lewat penjadwal. Pastikan cron memanggil <code
+                    class="{{ $c }}">php artisan schedule:run</code> tiap menit.</li>
         </ul>
     </x-showcase.section>
 
@@ -209,30 +275,42 @@
         <x-showcase.code lang="text">
             @verbatim
                 app/
-                ├─ Actions/Fortify/ CreateNewUser, ResetUserPassword
-                ├─ Enums/ UserRole (role awal), Ability (daftar permission)
+                ├─ Actions/
+                │ ├─ Api/ CreateApiToken, RevokeApiTokens
+                │ ├─ Fortify/ CreateNewUser, ResetUserPassword
+                │ ├─ Roles/ SaveRole, DeleteRole
+                │ └─ Users/ ChangeRole
+                ├─ Enums/ UserRole (role awal), Ability (permission), ApiScope (scope token)
+                ├─ Http/
+                │ ├─ Controllers/ SearchController, NotificationController, Api/*
+                │ ├─ Middleware/ EnsureApiAccess
+                │ ├─ Requests/Roles/ RoleRules, StoreRoleRequest, UpdateRoleRequest
+                │ └─ Resources/ RoleResource, PermissionResource, UserResource
                 ├─ Livewire/Concerns/ Notifies (toast dari komponen)
-                ├─ Models/ User (level, visibleTo), Role (level, is_system)
+                ├─ Models/ User (level, visibleTo, changePassword), Role (level, is_system)
+                ├─ Notifications/ AccountNotice
                 ├─ Policies/ UserPolicy, RolePolicy ← aturan hierarki di sini
                 ├─ Providers/ FortifyServiceProvider, AppServiceProvider
+                ├─ Search/ SearchSource, UserSearch, RoleSearch
                 ├─ Settings/ GeneralSettings, MailSettings
-                └─ Support/Navigation.php menyaring menu sidebar
-                config/admin.php menu, promo, akun awal, showcase
+                └─ Support/ Navigation (menu), GlobalSearch (pencarian)
+                config/admin.php menu, search, api, promo, akun awal, showcase
+                routes/ admin.php (halaman), api.php (API v1), console.php (jadwal)
                 resources/views/
                 ├─ layouts/ base, guest, app
                 ├─ components/
-                │ ├─ admin/ sidebar, nav-item, topbar, promo, save-bar
+                │ ├─ admin/ sidebar, nav-item, topbar, search, notifications, promo, save-bar
                 │ ├─ account/tabs
                 │ ├─ auth/shell
                 │ ├─ form/ input, select, toggle
-                │ ├─ ui/ button, card, badge, alert, dropdown, modal, ...
+                │ ├─ ui/ button, card, badge, alert, dropdown, modal, search, ...
                 │ ├─ showcase/ khusus halaman ini
                 │ └─ errors/page
                 ├─ auth/ halaman Fortify (Blade biasa, form POST)
                 ├─ errors/ 401 … 503
-                └─ pages/ account, users, roles, settings (Livewire)
+                └─ pages/admin/ dashboard, account, users, roles, settings (Livewire)
                 database/seeders/RolePermissionSeeder.php
-                tests/Feature/ policy, akses, auth, navigasi
+                tests/Feature/ policy, akses, auth, navigasi, API, pencarian, notifikasi
             @endverbatim
         </x-showcase.code>
     </x-showcase.section>
@@ -256,10 +334,10 @@
                 ],
             @endverbatim
         </x-showcase.code>
-        <ul class="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-slate-700">
-            <li><code class="rounded bg-slate-100 px-1 text-xs">icon</code> adalah nama berkas di <code
-                    class="rounded bg-slate-100 px-1 text-xs">resources/svg/lucide</code>. Nama yang salah tidak
-                menimbulkan galat, hanya komentar HTML.</li>
+        <ul class="{{ $ul }}">
+            <li><code class="{{ $c }}">icon</code> adalah nama berkas di <code
+                    class="{{ $c }}">resources/svg/lucide</code>. Nama yang salah tidak menimbulkan galat,
+                hanya komentar HTML.</li>
             <li>Salah ketik nama route membuat item hilang tanpa pesan. Pemeriksaan "Semua route terdaftar" di atas ada
                 untuk itu.</li>
             <li>Menu hanya mengatur tampilan. Otorisasi sebenarnya ada di route dan di dalam aksi komponen.</li>
@@ -268,28 +346,38 @@
 
     {{-- Halaman baru --}}
     <x-showcase.section id="halaman" title="Menambah halaman"
-        intro="Pola yang dipakai Users dan Roles: route yang dijaga policy, komponen Livewire, otorisasi ulang di setiap aksi.">
+        intro="Pola yang dipakai Users dan Roles: route yang dijaga policy, komponen Livewire yang tipis, logika tulis di Action, otorisasi ulang di setiap aksi.">
         <x-showcase.code lang="php">
             @verbatim
-                // routes/web.php
-                Route::middleware(['auth', 'can:viewAny,' . \App\Models\Contoh::class])->group(function () {
-                Route::livewire('/contoh', 'pages::contoh.index')->name('contoh.index');
+                // routes/admin.php: halaman biasa, di dalam grup ['auth', 'verified']
+                Route::livewire('/contoh', 'pages::admin.contoh.index')->name('contoh.index');
+
+                // halaman yang dijaga policy: grup sendiri, dan jangan lupa 'verified'
+                Route::middleware(['auth', 'verified', 'can:viewAny,' . \App\Models\Contoh::class])->group(function () {
+                Route::livewire('/contoh', 'pages::admin.contoh.index')->name('contoh.index');
                 });
             @endverbatim
         </x-showcase.code>
-        <x-showcase.code lang="resources/views/pages/contoh/⚡index.blade.php">{{ $sfc }}</x-showcase.code>
-        <ul class="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-slate-700">
-            <li>Tautan internal diberi <code class="rounded bg-slate-100 px-1 text-xs">wire:navigate</code> agar ada bar
-                progres. Form biasa (logout) memuat ulang halaman penuh.</li>
+        <x-showcase.code
+            lang="resources/views/pages/admin/contoh/⚡index.blade.php">{!! $sfc !!}</x-showcase.code>
+        <ul class="{{ $ul }}">
+            <li>Rujuk route dengan nama yang benar-benar terdaftar, mis. <code
+                    class="{{ $c }}">route('account.details')</code>, bukan <code
+                    class="{{ $c }}">route('account')</code>. Nama yang tidak ada baru terasa saat halaman
+                dirender.</li>
+            <li>Tautan internal diberi <code class="{{ $c }}">wire:navigate</code> agar ada bar progres.
+                Form biasa (logout) memuat ulang halaman penuh.</li>
             <li>Setelah aksi yang berakhir redirect, kirim pesan lewat <code
-                    class="rounded bg-slate-100 px-1 text-xs">session()->flash('toast', …)</code>, bukan <code
-                    class="rounded bg-slate-100 px-1 text-xs">notify()</code>.</li>
+                    class="{{ $c }}">session()->flash('toast', …)</code>, bukan <code
+                    class="{{ $c }}">notify()</code>.</li>
+            <li>Logika tulis (simpan, hapus, ubah role) berada di Action di <code
+                    class="{{ $c }}">app/Actions</code>, dipanggil oleh Livewire maupun API.</li>
         </ul>
     </x-showcase.section>
 
     {{-- Otorisasi --}}
     <x-showcase.section id="otorisasi" title="Otorisasi"
-        intro="Spatie Permission dengan role di database. Enum UserRole dan Ability hanya data awal; role tambahan dibuat lewat UI.">
+        intro="Spatie Permission dengan role di database. Enum UserRole dan Ability hanya data awal; role tambahan dibuat lewat halaman Roles.">
         <div class="overflow-x-auto">
             <table class="w-full min-w-[32rem] text-left text-sm text-slate-700">
                 <thead class="text-slate-500">
@@ -323,15 +411,22 @@
                 </tbody>
             </table>
         </div>
-        <ul class="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-slate-700">
+        <ul class="{{ $ul }}">
             <li>Aturannya "hanya di bawah": level yang sama tidak boleh saling mengelola. Tidak ada yang mengubah
                 akunnya sendiri lewat halaman Users; itu lewat Account.</li>
             <li>Role yang diberikan harus berlevel di bawah pemberinya, dan permission yang dibagikan harus dipegang
-                pemberinya.</li>
-            <li>Gunakan <code class="rounded bg-slate-100 px-1 text-xs">$user->can('nama.permission')</code>, bukan
-                <code class="rounded bg-slate-100 px-1 text-xs">hasPermissionTo()</code>: yang kedua tidak melewati
-                Gate, sehingga Super Admin ikut ditolak.
-            </li>
+                pemberinya. Penjaganya ada di <code class="{{ $c }}">SaveRole</code> dan <code
+                    class="{{ $c }}">ChangeRole</code>, bukan di komponen.</li>
+            <li>Semua penulisan role lewat <code class="{{ $c }}">SaveRole</code>, <code
+                    class="{{ $c }}">DeleteRole</code>, dan <code
+                    class="{{ $c }}">ChangeRole</code>. Satu <code
+                    class="{{ $c }}">Role::create()</code> di tempat lain membuka celah eskalasi hak.</li>
+            <li>Gunakan <code class="{{ $c }}">$user->can('nama.permission')</code>, bukan <code
+                    class="{{ $c }}">hasPermissionTo()</code>: yang kedua tidak melewati Gate, sehingga
+                Super Admin ikut ditolak.</li>
+            <li>Dua permission API: <code class="{{ $c }}">api.access</code> (boleh memakai API dengan token
+                pribadi) dan <code class="{{ $c }}">api.tokens.manage</code> (mencabut token akun di
+                bawahnya).</li>
         </ul>
         <x-showcase.code lang="langkah menambah permission">
             @verbatim
@@ -345,6 +440,158 @@
         </x-showcase.code>
     </x-showcase.section>
 
+    {{-- API --}}
+    <x-showcase.section id="api" title="API"
+        intro="API v1 hanya baca secara bawaan. Setiap permintaan harus lolos empat lapis; yang bocor di satu lapis tidak cukup untuk masuk.">
+        <ol class="list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-slate-700">
+            <li><strong>Token sah</strong> (Sanctum): belum kedaluwarsa, pemiliknya belum dinonaktifkan.</li>
+            <li><strong>Pemilik masih memegang <code class="{{ $c }}">api.access</code></strong> lewat
+                rolenya (middleware <code class="{{ $c }}">api.access</code>). Mencabutnya dari role
+                mematikan semua token pemegangnya seketika, tanpa menghapusnya.</li>
+            <li><strong>Token punya scope</strong> endpoint itu (<code
+                    class="{{ $c }}">abilities:users:read</code>). Scope yang boleh dipilih dibatasi
+                permission pemiliknya (<code class="{{ $c }}">ApiScope::requires()</code>).</li>
+            <li><strong>Policy mengizinkan</strong>, sama seperti di UI (hierarki, <code
+                    class="{{ $c }}">visibleTo</code>).</li>
+        </ol>
+
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[32rem] text-left text-sm text-slate-700">
+                <thead class="text-slate-500">
+                    <tr>
+                        <th class="py-2 pr-4 font-medium">Scope</th>
+                        <th class="py-2 pr-4 font-medium">Memerlukan permission</th>
+                        <th class="py-2 font-medium">Endpoint</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    <tr>
+                        <td class="py-2 pr-4"><code class="{{ $c }}">users:read</code></td>
+                        <td class="pr-4">users.view</td>
+                        <td>GET /api/v1/users, /users/{user}</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2 pr-4"><code class="{{ $c }}">roles:read</code></td>
+                        <td class="pr-4">roles.view</td>
+                        <td>GET /api/v1/roles, /roles/{role}, /permissions</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2 pr-4"><code class="{{ $c }}">roles:write</code></td>
+                        <td class="pr-4">roles.manage</td>
+                        <td>POST, PUT, DELETE /api/v1/roles (hanya bila ADMIN_API_WRITES=true)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <x-showcase.code lang="langkah menambah endpoint baca">
+            @verbatim
+                1. Resource : app/Http/Resources/LaporanResource.php (@mixin App\Models\Laporan)
+                2. Controller : app/Http/Controllers/Api/LaporanController.php (#[Group('Laporan')],
+                Gate::authorize('viewAny', ...), query ->visibleTo($request->user()))
+                3. Scope : tambah case di App\Enums\ApiScope + requires() ke permission-nya
+                4. Route : routes/api.php → ->middleware('abilities:laporan:read')
+                5. Tes : token tanpa scope = 403, tanpa api.access = 403, bentuk JSON sesuai Resource
+                6. Dokumen : buka /docs/api dan periksa hasilnya
+            @endverbatim
+        </x-showcase.code>
+
+        <ul class="{{ $ul }}">
+            <li>Token dibuat pemiliknya di halaman <code class="{{ $c }}">Account → API</code>: nama,
+                scope, masa berlaku 30, 90, atau 180 hari, dan konfirmasi password. Token ditampilkan sekali; yang
+                tersimpan hanya hash.</li>
+            <li>Token dicabut otomatis saat akun dinonaktifkan, saat password direset, dan saat role pemiliknya
+                kehilangan <code class="{{ $c }}">api.access</code> lewat halaman Users.</li>
+            <li>Untuk integrasi antar-sistem, pakai akun layanan dengan role khusus, bukan akun pegawai: token pribadi
+                ikut mati ketika orangnya pindah.</li>
+            <li>Dokumentasi otomatis (Scramble) ada di <code class="{{ $c }}">/docs/api</code>. Di luar
+                local hanya Super Admin yang bisa membukanya; untuk dibagikan ke pihak lain gunakan <code
+                    class="{{ $c }}">php artisan scramble:export</code>.</li>
+            <li>Permintaan selalu dibalas JSON untuk <code class="{{ $c }}">api/*</code>, dibatasi 60 per
+                menit per pengguna.</li>
+        </ul>
+    </x-showcase.section>
+
+    {{-- Pencarian global --}}
+    <x-showcase.section id="pencarian" title="Pencarian global"
+        intro="Kotak pencarian di topbar (⌘K atau Ctrl K). Mengikuti pola global search Filament: tiap model punya satu kelas SearchSource yang mendeklarasikan cara ia dicari; mesinnya generik.">
+        <x-showcase.code lang="php">
+            @verbatim
+                // app/Search/SchoolSearch.php (turunan App\Search\SearchSource)
+                public function label(): string { return 'Schools'; }
+                public function attributes(): array { return ['name', 'npsn', 'district.name']; } // titik = relasi
+                public function canSearch(User $actor): bool { return $actor->can('viewAny', School::class); }
+                public function query(User $actor): Builder { return School::query()->visibleTo($actor)->with('district'); }
+                public function title(Model $record): string { return $record->name; }
+                public function details(Model $record): array { return ['NPSN' => $record->npsn]; }
+                public function url(Model $record): string { return route('schools.show', $record); }
+
+                // config/admin.php → 'search' => [ ..., \App\Search\SchoolSearch::class ]
+            @endverbatim
+        </x-showcase.code>
+        <ul class="{{ $ul }}">
+            <li>Hanya sumber yang terdaftar di <code class="{{ $c }}">admin.search</code> yang dicari.
+                Daftar kosong menyembunyikan kotak pencarian.</li>
+            <li>Kata kunci dipecah per kata: tiap kata harus cocok di setidaknya satu kolom. Minimal 2 karakter,
+                maksimal 5 kata, 5 hasil per kelompok. <code class="{{ $c }}">%</code> dan <code
+                    class="{{ $c }}">_</code> dianggap huruf biasa.</li>
+            <li><strong>Keamanan ada di sumber.</strong> Mesin hanya memanggil <code
+                    class="{{ $c }}">canSearch</code> dan <code class="{{ $c }}">query</code>.
+                Sumber yang lupa <code class="{{ $c }}">visibleTo</code> atau policy membocorkan data yang
+                disembunyikan di halaman biasa.</li>
+            <li>Urutan kelompok mengikuti <code class="{{ $c }}">sort()</code>, bukan urutan di config.
+                Akun yang dinonaktifkan tidak pernah muncul.</li>
+        </ul>
+    </x-showcase.section>
+
+    {{-- Notifikasi --}}
+    <x-showcase.section id="notifikasi" title="Notifikasi"
+        intro="Dua jenis, untuk dua keperluan: toast dan alert untuk umpan balik tindakan, dan lonceng di topbar untuk riwayat pemberitahuan akun.">
+
+        <h3 class="text-sm font-semibold text-slate-900">Toast dan alert</h3>
+        <x-showcase.code lang="php">
+            @verbatim
+                // Di komponen Livewire (trait App\Livewire\Concerns\Notifies)
+                $this->notify('Tersimpan.'); // tetap di halaman
+                $this->notify('Gagal mengirim.', 'danger'); // error menetap
+
+                // Sebelum redirect (komponen lama hilang bersama halamannya)
+                session()->flash('toast', ['type' => 'success', 'message' => 'Akun dihapus.']);
+
+                // Dari JavaScript atau Alpine
+                window.toast({ type: 'info', message: '...' });
+            @endverbatim
+        </x-showcase.code>
+
+        <h3 class="pt-2 text-sm font-semibold text-slate-900">Lonceng (notifikasi akun)</h3>
+        <p class="max-w-[70ch] text-sm leading-relaxed text-slate-700">
+            Tersimpan di tabel <code class="{{ $c }}">notifications</code> dan hanya ditujukan kepada
+            pemilik akun.
+            Empat peristiwa bawaan: role diubah orang lain, token API dicabut admin, password diganti, dan 2FA yang
+            sudah aktif dimatikan.
+        </p>
+        <x-showcase.code lang="php">
+            @verbatim
+                // Satu kelas, dua argumen: teks pendek dan tautan (path relatif, bukan URL penuh)
+                $user->notify(new AccountNotice('Pesan pendek.', route('account.security', absolute: false)));
+
+                // Rujuk route yang pasti ada. Pemicu berada di dalam tindakan utama (sering di dalam transaksi),
+                // jadi nama route yang salah akan menggagalkan tindakan itu, bukan hanya notifikasinya.
+            @endverbatim
+        </x-showcase.code>
+        <ul class="{{ $ul }}">
+            <li>Isinya hanya teks dan tautan. Jangan memuat token, password, atau nama orang yang melakukan perubahan
+                ("an administrator").</li>
+            <li>Mengganti password selalu lewat <code class="{{ $c }}">User::changePassword()</code>, bukan
+                <code class="{{ $c }}">forceFill</code> langsung, agar pemiliknya diberi tahu.</li>
+            <li>Tidak ada polling atau real-time: hitungan dimuat saat halaman dimuat, daftar saat lonceng dibuka.
+                Notifikasi keamanan sebaiknya juga dikirim lewat email bila SMTP tersedia, karena korban pembajakan akun
+                tidak melihat lonceng.</li>
+            <li>Pembersihan: <code class="{{ $c }}">php artisan notifications:prune</code> (terjadwal
+                harian) menghapus yang dibaca lebih dari 30 hari dan yang tak pernah dibaca lebih dari 180 hari.</li>
+        </ul>
+    </x-showcase.section>
+
     {{-- Setelan --}}
     <x-showcase.section id="setelan" title="Setelan aplikasi"
         intro="spatie/laravel-settings untuk nilai yang boleh diubah admin lewat UI. Rahasia dan kredensial tetap di .env.">
@@ -356,20 +603,21 @@
                 // 2. database/settings/xxxx_add_footer_text.php → migrasi nilai awal
                 $this->migrator->add('general.footer_text', null);
 
-                // 3. resources/views/pages/settings/⚡general.blade.php
+                // 3. resources/views/pages/admin/settings/⚡general.blade.php
                 // tambah properti di komponen, field di form, dan aturan validasi di save()
 
                 // Membaca di mana saja
                 app(\App\Settings\GeneralSettings::class)->footer_text;
             @endverbatim
         </x-showcase.code>
-        <ul class="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-slate-700">
+        <ul class="{{ $ul }}">
             <li>Properti tanpa migrasi nilai awal akan melempar <code
-                    class="rounded bg-slate-100 px-1 text-xs">MissingSettings</code>.</li>
+                    class="{{ $c }}">MissingSettings</code>.</li>
+            <li>Zona waktu di Settings hanya zona <em>tampilan</em> (mis. sapaan di dashboard). Penyimpanan tetap UTC.
+            </li>
             <li>Di production, aktifkan cache setelan (<code
-                    class="rounded bg-slate-100 px-1 text-xs">SETTINGS_CACHE_ENABLED</code>). Dengan cache aktif,
-                perubahan langsung di database butuh <code class="rounded bg-slate-100 px-1 text-xs">php artisan
-                    settings:clear-cache</code>.</li>
+                    class="{{ $c }}">SETTINGS_CACHE_ENABLED</code>). Dengan cache aktif, perubahan langsung
+                di database butuh <code class="{{ $c }}">php artisan settings:clear-cache</code>.</li>
         </ul>
     </x-showcase.section>
 
@@ -387,6 +635,8 @@
                     <x-ui.button variant="danger" icon="trash-2">Danger</x-ui.button>
                     <x-ui.button size="sm">Small</x-ui.button>
                     <x-ui.button size="icon" pill aria-label="Notifikasi"><x-ui.icon name="bell"
+                            size="sm" /></x-ui.button>
+                    <x-ui.button size="icon-sm" variant="ghost" aria-label="Opsi"><x-ui.icon name="ellipsis"
                             size="sm" /></x-ui.button>
                     <x-ui.button href="#kesiapan">Sebagai tautan</x-ui.button>
                 </div>
@@ -445,6 +695,28 @@
                     <x-form.select label="Peran" name="demo_peran" :options="['a' => 'Operator', 'b' => 'Regular User']" />
                     <x-form.toggle label="Aktifkan fitur" description="Penjelasan singkat di bawah label." />
                 </div>
+            @endverbatim
+        </x-showcase.example>
+
+        <x-showcase.example title="Kolom pencarian (ui.search)">
+            @verbatim
+                <div class="max-w-sm space-y-3">
+                    <x-ui.search outline placeholder="Cari akun…" />
+                    <x-ui.search placeholder="Varian bulat" />
+                </div>
+            @endverbatim
+        </x-showcase.example>
+
+        <x-showcase.example title="Bagian formulir (ui.form-section)">
+            @verbatim
+                <x-ui.form-section title="Informasi pribadi"
+                    description="Judul dan penjelasan di kiri, kartu isian di kanan.">
+                    <x-form.input label="Nama" name="demo_fs" placeholder="Nama lengkap" />
+
+                    <x-slot:actions>
+                        <x-ui.button type="submit" variant="dark">Simpan</x-ui.button>
+                    </x-slot:actions>
+                </x-ui.form-section>
             @endverbatim
         </x-showcase.example>
 
@@ -517,27 +789,9 @@
         </x-showcase.example>
     </x-showcase.section>
 
-    {{-- Notifikasi --}}
-    <x-showcase.section id="notifikasi" title="Notifikasi"
-        intro="Toast untuk konfirmasi tindakan, alert inline untuk pesan yang harus tetap terlihat di halaman.">
-        <x-showcase.code lang="php">
-            @verbatim
-                // Di komponen Livewire (trait App\Livewire\Concerns\Notifies)
-                $this->notify('Tersimpan.'); // tetap di halaman
-                $this->notify('Gagal mengirim.', 'danger'); // error menetap
-
-                // Sebelum redirect (komponen lama hilang bersama halamannya)
-                session()->flash('toast', ['type' => 'success', 'message' => 'Akun dihapus.']);
-
-                // Dari JavaScript atau Alpine
-                window.toast({ type: 'info', message: '...' });
-            @endverbatim
-        </x-showcase.code>
-    </x-showcase.section>
-
     {{-- Turunan --}}
     <x-showcase.section id="turunan" title="Aplikasi turunan"
-        intro="Core sengaja tidak punya Units atau pembatasan data per organisasi. Itu ditambahkan per aplikasi lewat satu titik sambung di model User.">
+        intro="Core sengaja tidak punya Units atau pembatasan data per organisasi. Itu ditambahkan per aplikasi lewat satu titik sambung di model User, yang dipakai halaman Users, dashboard, pencarian, dan API.">
         <x-showcase.code lang="php">
             @verbatim
                 // app/Models/User.php: ubah KEDUANYA bersama, harus konsisten
@@ -552,14 +806,18 @@
                 }
             @endverbatim
         </x-showcase.code>
-        <ul class="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-slate-700">
-            <li>Scope menyaring <strong>daftar</strong>, <code
-                    class="rounded bg-slate-100 px-1 text-xs">isVisibleTo</code> menyaring <strong>akses langsung per
-                    id</strong> lewat policy. Lupa salah satunya adalah kebocoran data.</li>
-            <li>Halaman Users harus memakai <code class="rounded bg-slate-100 px-1 text-xs">visibleTo()</code> pada
-                daftar dan pada setiap <code class="rounded bg-slate-100 px-1 text-xs">findOrFail</code>.</li>
-            <li>Catat setiap penyimpangan dari Core di <code
-                    class="rounded bg-slate-100 px-1 text-xs">DECISIONS.md</code> aplikasi turunan.</li>
+        <ul class="{{ $ul }}">
+            <li>Scope menyaring <strong>daftar</strong>, <code class="{{ $c }}">isVisibleTo</code>
+                menyaring <strong>akses langsung per id</strong> lewat policy. Lupa salah satunya adalah kebocoran data.
+            </li>
+            <li>Setiap permukaan baru yang menampilkan akun harus memakainya: halaman, <strong>sumber
+                    pencarian</strong>, dan <strong>endpoint API</strong>. Pada ketiganya <code
+                    class="{{ $c }}">visibleTo()</code> ditaruh di query dasar.</li>
+            <li>Widget dashboard aplikasi ditaruh di <code
+                    class="{{ $c }}">resources/views/dashboard/extra.blade.php</code>; Core menyertakannya
+                otomatis, tanpa menyunting dashboard Core.</li>
+            <li>Catat setiap penyimpangan dari Core di <code class="{{ $c }}">DECISIONS.md</code> aplikasi
+                turunan.</li>
         </ul>
     </x-showcase.section>
 
@@ -567,7 +825,20 @@
     <x-showcase.section id="rilis" title="Sebelum rilis"
         intro="Hal yang harus diganti atau dibuang pada aplikasi turunan.">
         <ul class="space-y-2 text-sm leading-relaxed text-slate-700">
-            @foreach (['Nama aplikasi dan logo (Settings → General, huruf awal di shell auth dan sidebar)', 'Ilustrasi di public/images (auth-*.svg), pakai aset berlisensi', 'Tautan Terms dan Privacy, serta teks di halaman auth', 'Halaman awal: tambahkan widget lewat resources/views/dashboard/extra.blade.php, jangan menyunting dashboard Core', 'Landing contoh, kartu promo (admin.promo.enabled), dan komponen yang tidak dipakai', 'SHOWCASE_ENABLED=false dan halaman ini dibiarkan tidak terdaftar', 'Mailer dan queue sungguhan (bukan log atau sync), APP_DEBUG=false, npm run build', 'SESSION_DRIVER=database dan SETTINGS_CACHE_ENABLED=true', 'Akun Super Admin awal dibuat, lalu INITIAL_ADMIN_PASSWORD dihapus dari .env', 'DECISIONS.md dan REQUIREMENTS.md diperbarui untuk aplikasi ini'] as $item)
+            @foreach ([
+        'Nama aplikasi dan logo (Settings → General, huruf awal di shell auth dan sidebar)',
+        'Ilustrasi di public/images (auth-*.svg), pakai aset berlisensi, dan font dihosting sendiri bila jaringan membatasi akses keluar',
+        'Tautan Terms dan Privacy, serta teks di halaman auth dan landing',
+        'Halaman awal: tambahkan widget lewat resources/views/dashboard/extra.blade.php, jangan menyunting dashboard Core',
+        'Kartu promo (admin.promo.enabled) dan komponen yang tidak dipakai',
+        'SHOWCASE_ENABLED=false dan halaman ini dibiarkan tidak terdaftar',
+        'Mailer dan queue sungguhan (bukan log atau sync), APP_DEBUG=false, npm run build',
+        'SESSION_DRIVER=database dan SETTINGS_CACHE_ENABLED=true',
+        'SANCTUM_EXPIRATION diisi; ADMIN_API_WRITES=false kecuali ada klien yang butuh; akses /docs/api dibatasi atau diganti berkas hasil scramble:export',
+        'Cron untuk php artisan schedule:run agar notifikasi lama dibersihkan',
+        'Akun Super Admin awal dibuat, lalu INITIAL_ADMIN_PASSWORD dihapus dari .env',
+        'Pemeriksaan kesiapan di halaman ini semuanya OK, dan seluruh tes lulus',
+    ] as $item)
                 <li class="flex items-start gap-3">
                     <span class="mt-1.5 size-1.5 shrink-0 rounded-full bg-orange-500" aria-hidden="true"></span>
                     {{ $item }}
